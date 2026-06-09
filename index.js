@@ -23,7 +23,8 @@ function git(...args) {
 }
 
 function die(msg, code = 1) { console.error(`✗ autogit: ${msg}`); process.exit(code); }
-function ok(msg) { console.log(`✓ autogit: ${msg}`); }
+// stderr, not stdout: Codex Stop hooks treat plain text on stdout as invalid JSON.
+function ok(msg) { console.error(`✓ autogit: ${msg}`); }
 
 function repoRootOrNull() {
   const r = git("rev-parse", "--show-toplevel");
@@ -182,7 +183,7 @@ function cmdShip(args) {
   try { config = { ...DEFAULTS, ...JSON.parse(readFileSync(cfgPath, "utf8")) }; }
   catch { die(`${CONFIG_FILE} is not valid JSON.`); }
   if (config.mode !== "auto") {
-    console.log(`autogit: mode "${config.mode}" not supported yet — skipping.`);
+    console.error(`autogit: mode "${config.mode}" not supported yet — skipping.`);
     process.exit(0);
   }
 
