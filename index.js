@@ -11,6 +11,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 
 const CONFIG_FILE = ".autogit.json";
+// Defaults mirror the MVP's current auto-push behavior.
 const DEFAULTS = { mode: "auto", remote: "origin", branch: "current", secretsScan: true };
 
 // ---------- helpers ----------
