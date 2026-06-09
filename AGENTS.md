@@ -9,7 +9,7 @@
 One mode, two switches:
 
 - **auto mode only.** Ship immediately, no review gate. Review modes come later (see Roadmap).
-- **Install once, globally**: `autogit setup` wires the user's agents' lifecycle hooks — Claude Code `Stop` hook (`~/.claude/settings.json`) and Codex `notify` (`~/.codex/config.toml`) — so `autogit ship` runs after every agent turn, in every project.
+- **Install once, globally**: `autogit setup` wires the user's agents' lifecycle hooks — Claude Code `Stop` hook (`~/.claude/settings.json`), Codex `notify` (`~/.codex/config.toml`), and a Pi extension (`~/.pi/agent/extensions/autogit.ts`, fires on `agent_end`) — so `autogit ship` runs after every agent turn, in every project.
 - **Opt-in per repo**: `autogit on` writes `.autogit.json`. In repos without it, `ship` is a silent no-op (exit 0). The per-repo switch is the safety model for the MVP: only enable it where aggressive auto-push is OK.
 
 ## How `ship` works
@@ -33,7 +33,7 @@ One mode, two switches:
 
 - **agent mode** — an LLM reviews the diff before push. Owner decision 2026-06-09: the *currently-running* agent should review (it has task context), not a separate OpenRouter call. Mechanics TBD.
 - **human mode** — terminal y/n prompt on the diff, for production repos. (Existed in the pre-MVP prototype, cut for focus.)
-- More agents (Pi Agent, Hermes, …) in `setup`.
+- More agents (Hermes, …) in `setup`. (Pi added 2026-06-10. Hermes needs `post_llm_call` shell hook in `~/.hermes/config.yaml` + reading `cwd` from stdin JSON in `ship` + user consent flow.)
 - Branch strategy: currently current-branch push only; auto-branch + PR flow considered.
 - ~~Package name~~ — DECIDED 2026-06-10: npm name is **`auto-git`** (checked: free; `autogit` and `autogit-cli` are taken). The installed binary stays `autogit`.
 
