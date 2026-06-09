@@ -1,65 +1,54 @@
 # autogit
 
-Auto **stage → commit → push** for agentic engineers. Works with any coding agent — Claude Code, Codex, Pi Agent, Hermes, or anything that can run a shell command.
+Your AI coding agent writes the code. **autogit ships it.**
 
-Your agent writes the code *and* the commit message. autogit ships it — with the safety level you choose.
+Every time your agent finishes a turn, autogit stages, commits, and pushes — automatically. Built for agentic engineers who don't write code by hand.
 
-## Install
+Works with **Claude Code** and **Codex**.
+
+## Install (once per machine)
 
 ```bash
 npm install -g autogit-cli
+autogit setup
 ```
 
-## Setup (per repo)
+`autogit setup` hooks into your agents — Claude Code's `Stop` hook and Codex's `notify` — so autogit runs after every agent turn, in every project.
+
+> Not on npm yet? From source: `git clone https://github.com/davidondrej/autogit && cd autogit && npm link`
+
+## Turn it on (per repo)
 
 ```bash
-autogit init
+autogit on
 ```
 
-Creates `.autogit.json`:
+That's it. From now on: agent finishes → stage → secrets scan → commit → push.
 
-```json
-{
-  "mode": "human",
-  "remote": "origin",
-  "branch": "current",
-  "secretsScan": true,
-  "review": {
-    "provider": "openrouter",
-    "model": "anthropic/claude-sonnet-4.5",
-    "apiKeyEnv": "OPENROUTER_API_KEY"
-  }
-}
-```
-
-## Modes
-
-- **`auto`** — ship immediately. For throwaway projects and max velocity.
-- **`agent`** — a separate LLM (via OpenRouter) reviews the diff and approves/rejects before push.
-- **`human`** — terminal `y/n` prompt showing the diff. For your most sensitive repos.
-
-## Hook up your agent
-
-Add one line to `CLAUDE.md` / `AGENTS.md` / your agent's instructions:
-
-```
-After completing each task, run: autogit ship -m "<concise commit message>"
-```
-
-That's it. The agent decides *what* to say; autogit decides *whether* it ships.
-
-## Safety
-
-- Secrets scan on every staged diff (AWS, OpenAI, Anthropic, GitHub, Slack, Google keys, private key blocks, `.env` files, JWTs). Blocks the push; override with `--force-secrets`.
-- `human` mode refuses to run in non-interactive shells, so an agent can't approve on your behalf.
-- Rejections fully unstage — your working tree is untouched.
+Repos where you didn't run `autogit on` are never touched — autogit stays completely silent there.
 
 ## Commands
 
 ```
-autogit init                  Set up .autogit.json
-autogit ship -m "message"     Stage, scan, gate, commit, push
-autogit status                Show config
+autogit setup     Wire up agent hooks (once per machine)
+autogit on        Enable auto-push in this repo
+autogit off       Disable auto-push in this repo
+autogit ship      Stage, scan, commit, push (what the hook runs)
+autogit status    Show hooks + repo state
 ```
+
+`autogit ship -m "message"` uses your message; without `-m` it auto-generates one from the changed files.
+
+## Safety
+
+- **Opt-in per repo.** Auto-push only happens where you explicitly turned it on.
+- **Secrets scan** on every diff: AWS, OpenAI, Anthropic, GitHub, Slack, Google keys, private key blocks, `.env` files, JWTs. Findings block the push and unstage everything. Override with `--force-secrets`.
+- **Nothing to commit → no-op.** Question-only agent turns don't create noise.
+
+## Roadmap
+
+- **agent mode** — an LLM reviews the diff before push, for more serious repos.
+- **human mode** — terminal y/n prompt on the diff, for production repos.
+- More agents.
 
 MIT

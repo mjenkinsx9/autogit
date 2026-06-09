@@ -2,46 +2,43 @@
 
 ## What this is
 
-**autogit** automates the stage → commit → push loop for engineers working with AI coding agents (Claude Code, Codex, etc.). After an agent finishes a task, changes ship to git automatically, with a configurable safety level.
+**autogit** — auto **stage → commit → push** for agentic engineers: people who use AI coding agents (Claude Code, Codex, etc.) for everything and don't write code by hand. After every agent turn, the work ships to GitHub automatically.
 
-## Safety modes
+## MVP scope (current — DECIDED 2026-06-10)
 
-- **auto** — ship immediately, no gate
-- **agent** — a separate LLM reviews the staged diff and approves/rejects before push
-- **human** — interactive terminal y/n prompt showing the diff (for sensitive repos)
+One mode, two switches:
 
-## Current implementation
+- **auto mode only.** Ship immediately, no review gate. Review modes come later (see Roadmap).
+- **Install once, globally**: `autogit setup` wires the user's agents' lifecycle hooks — Claude Code `Stop` hook (`~/.claude/settings.json`) and Codex `notify` (`~/.codex/config.toml`) — so `autogit ship` runs after every agent turn, in every project.
+- **Opt-in per repo**: `autogit on` writes `.autogit.json`. In repos without it, `ship` is a silent no-op (exit 0). The per-repo switch is the safety model for the MVP: only enable it where aggressive auto-push is OK.
 
-A zero-dependency Node.js CLI (`index.js`, ESM, Node ≥18) with three commands:
+## How `ship` works
 
-- `autogit init` — writes a per-repo `.autogit.json` config (mode, remote, branch, secretsScan toggle, OpenRouter review settings)
-- `autogit ship -m "message"` — the main pipeline: `git add -A` → regex secrets scan on added lines (AWS/OpenAI/Anthropic/GitHub/Slack/Google keys, private key blocks, `.env` filenames, JWTs; blockable, `--force-secrets` overrides) → mode gate → commit → push
-- `autogit status` — show config and repo state
+`git add -A` → secrets scan on added lines (AWS/OpenAI/Anthropic/GitHub/Slack/Google keys, private key blocks, `.env` filenames, JWTs; `--force-secrets` overrides) → commit (uses `-m` if given, else auto-generates a message from changed files) → push to `origin`/current branch.
 
-## Key design choices (provisional, open to revision)
+## Architecture
 
-- **Agent-invoked CLI**, not a daemon/cron/watcher/git-hook. One instruction line in CLAUDE.md/AGENTS.md tells the agent to run `autogit ship` after each task. Chosen because shell execution is the one interface every agent shares.
-- **The agent writes the commit message** — the tool just ships it, no LLM call for message generation.
-- **Per-repo JSON config** — safety level is a property of the repo, not the user.
-- **Agent-review mode** calls OpenRouter chat completions with the diff (truncated to 60k chars) and parses an `APPROVE:`/`REJECT:` verdict line.
-- **npm distribution** — target audience already has Node. (Go/Rust single binary was considered.)
+- Single zero-dependency Node.js CLI: `index.js`, ESM, Node ≥18, npm-distributed.
+- Commands: `setup`, `on`, `off`, `ship`, `status`.
+- Codex `notify` passes a JSON payload with `cwd` as the last argument — `ship` detects it and runs in that directory.
 
-## Fail-safe behaviors
+## Fail-safes
 
-- Default mode is **human**.
-- Every rejection fully unstages via `git reset`.
-- Human mode refuses to run without a TTY, so an agent can't pipe "y" to approve itself.
-- Distinct exit codes: 0 ok, 1 error, 2 rejected, 3 no-TTY — agents can read outcomes programmatically.
+- Per-repo opt-in; silent everywhere else.
+- Hooks must never disturb the agent: `ship` exits 0 on every no-op path, and never exits 2 (which would block Claude Code's Stop hook).
+- Secrets scan blocks the push and fully unstages (`git reset`).
+- Nothing staged → no commit, no push, no noise.
 
-## Open questions (confirm with owner before changing)
+## Roadmap (do not build without owner)
 
-- **Trigger**: stay agent-invoked, or become a file-watcher/quiescence daemon? Owner does not want to be locked into "agent finishes task" as the only trigger.
-- **Agent review**: could the currently-running agent review instead of a separate OpenRouter call?
-- **Branch strategy**: currently pushes to current or configured branch — no auto-branching/PR flow yet.
+- **agent mode** — an LLM reviews the diff before push. Owner decision 2026-06-09: the *currently-running* agent should review (it has task context), not a separate OpenRouter call. Mechanics TBD.
+- **human mode** — terminal y/n prompt on the diff, for production repos. (Existed in the pre-MVP prototype, cut for focus.)
+- More agents (Pi Agent, Hermes, …) in `setup`.
+- Branch strategy: currently current-branch push only; auto-branch + PR flow considered.
 - **Package name**: `autogit-cli` is a placeholder; npm availability unchecked.
 
-## Ground rules for agents
+## Ground rules
 
-Treat the prototype as a reference implementation of the product intent, not a fixed architecture. Confirm any major structural change with the owner before implementing.
-
-Make all of your responses clear & very concise.
+- Keep it minimal: small files, zero dependencies, simplest thing that works.
+- Treat the implementation as a reference of product intent, not fixed architecture.
+- Confirm any major structural change with the owner before implementing.
