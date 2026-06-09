@@ -35,7 +35,7 @@ One mode, two switches:
 - **human mode** — terminal y/n prompt on the diff, for production repos. (Existed in the pre-MVP prototype, cut for focus.)
 - More agents (Pi Agent, Hermes, …) in `setup`.
 - Branch strategy: currently current-branch push only; auto-branch + PR flow considered.
-- **Package name**: `autogit-cli` is a placeholder; npm availability unchecked.
+- ~~Package name~~ — DECIDED 2026-06-10: npm name is **`auto-git`** (checked: free; `autogit` and `autogit-cli` are taken). The installed binary stays `autogit`.
 
 ## Ground rules
 

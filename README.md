@@ -9,7 +9,7 @@ Works with **Claude Code** and **Codex**.
 ## Install (once per machine)
 
 ```bash
-npm install -g autogit-cli
+npm install -g auto-git
 autogit setup
 ```
 

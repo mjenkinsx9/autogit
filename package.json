@@ -1,5 +1,5 @@
 {
-  "name": "autogit-cli",
+  "name": "auto-git",
   "version": "0.1.0",
   "description": "Auto stage→commit→push for agentic engineers. Works with any coding agent.",
   "author": "David Ondrej",
