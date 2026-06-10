@@ -11,6 +11,7 @@ Everything about the project — what it is, architecture, internals, roadmap �
 
 ## Working rules
 
+- **NEVER publish to npm yourself** — no `npm publish`, ever (it's behind 2FA anyway). When a release is ready, ask David (the human) to publish: give clear & concise instructions plus the exact terminal command in a code block.
 - Keep it minimal: small files, zero dependencies, simplest thing that works.
 - Treat the implementation as a reference of product intent, not fixed architecture.
 - Confirm any major structural change with the owner before implementing.
