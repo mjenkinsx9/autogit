@@ -128,7 +128,10 @@ function setupCodex() {
       claudeStyleEntry(c, "UserPromptSubmit", "autogit busy");
       claudeStyleEntry(c, "PostToolUse", "autogit busy");
     });
-  }) ?? `wired (${file}) — open codex and run /hooks once to trust it`;
+  // Codex trust is hash-based: it silently skips hooks until the user trusts
+  // them via /hooks, and re-flags them whenever this file's entries change.
+  // Live edits also disable hooks in already-running sessions until restart.
+  }) ?? `wired (${file}) — restart any open codex sessions, then run /hooks inside codex to trust autogit`;
 }
 
 function setupCursor() {
@@ -310,19 +313,27 @@ function promptText(payload) {
   return null;
 }
 
-// Claude's Stop payload has no prompt, but points at the session transcript
-// (JSONL). Walk it backwards for the last real user message.
+// Stop payloads carry no prompt, but point at the session transcript.
+// Claude transcripts and Codex rollouts are both JSONL — walk backwards for
+// the last real user message. Line shapes (officially unstable; parse defensively):
+//   Claude: {"type":"user","message":{"content":"..."|[{"type":"text","text":"..."}]}}
+//   Codex:  {"type":"event_msg","payload":{"type":"user_message","message":"..."}}
 function lastPromptFromTranscript(file) {
   try {
     const lines = readFileSync(file, "utf8").split("\n");
     for (let i = lines.length - 1; i >= 0; i--) {
       if (!lines[i].trim()) continue;
       let e; try { e = JSON.parse(lines[i]); } catch { continue; }
-      if (e.type !== "user" || e.isMeta) continue;
-      const c = e.message?.content;
-      const text = typeof c === "string" ? c
-        : Array.isArray(c) ? c.filter(p => p.type === "text").map(p => p.text).join(" ") : "";
-      if (!text.trim() || text.startsWith("<")) continue; // tool results / slash-command noise
+      let text;
+      if (e.type === "user" && !e.isMeta) { // Claude
+        const c = e.message?.content;
+        text = typeof c === "string" ? c
+          : Array.isArray(c) ? c.filter(p => p.type === "text").map(p => p.text).join(" ") : "";
+      } else if (e.type === "event_msg" && e.payload?.type === "user_message") { // Codex
+        text = typeof e.payload.message === "string" ? e.payload.message : "";
+      } else continue;
+      // skip tool results, slash-command noise, <user_instructions>/<environment_context> blobs
+      if (!text.trim() || text.trim().startsWith("<")) continue;
       return text.trim();
     }
   } catch {}
@@ -402,9 +413,12 @@ function shipRepo(dir, args, id, payload) {
   if (branch === "HEAD") { git("reset"); die("detached HEAD — won't auto-push."); }
 
   // subject: explicit -m > this turn's prompt (busy marker, payload, or
-  // Claude transcript) > file-list fallback. Trailer marks the commit as ours.
+  // transcript) > the agent's final message (Codex Stop payload) > file list.
+  // Trailer marks the commit as ours.
   const prompt = storedPrompt || promptText(payload)
-    || (payload?.transcript_path ? lastPromptFromTranscript(payload.transcript_path) : null);
+    || (payload?.transcript_path ? lastPromptFromTranscript(payload.transcript_path) : null)
+    || (typeof payload?.last_assistant_message === "string" && payload.last_assistant_message.trim()
+        ? payload.last_assistant_message : null);
   const subject = message || (prompt ? subjectFrom(prompt) : autoMessage(staged));
   const commit = git("commit", "-m", subject, "-m", SHIP_TRAILER);
   if (!commit.ok) die(`commit failed:\n${commit.out}`);
