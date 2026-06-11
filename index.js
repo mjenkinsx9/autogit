@@ -53,6 +53,13 @@ const SECRET_PATTERNS = [
 
 const SENSITIVE_FILES = [/^\.env(\..+)?$/, /\.pem$/, /\.key$/, /id_rsa/, /credentials\.json$/];
 
+// Prompts can carry pasted secrets — those must never become commit subjects.
+// Checks the full text (not the truncated subject) so a key cut off at 72
+// chars can't leak its prefix. Same conservative patterns as the diff scan.
+function hasSecret(text) {
+  return SECRET_PATTERNS.some(({ re }) => re.test(text));
+}
+
 function scanSecrets() {
   const findings = [];
   const staged = git("diff", "--cached", "--name-only").out.split("\n").filter(Boolean);
@@ -417,10 +424,16 @@ function shipRepo(dir, args, id, payload) {
   // subject: explicit -m > this turn's prompt (busy marker, payload, or
   // transcript) > the agent's final message (Codex Stop payload) > file list.
   // Trailer marks the commit as ours.
-  const prompt = storedPrompt || promptText(payload)
+  let prompt = storedPrompt || promptText(payload)
     || (payload?.transcript_path ? lastPromptFromTranscript(payload.transcript_path) : null)
     || (typeof payload?.last_assistant_message === "string" && payload.last_assistant_message.trim()
         ? payload.last_assistant_message : null);
+  // a prompt with a pasted secret never becomes the subject — file list instead
+  // (deliberate: --force-secrets does NOT override this)
+  if (prompt && hasSecret(prompt)) {
+    console.error("autogit: prompt looks like it contains a secret — using file-list commit subject.");
+    prompt = null;
+  }
   const subject = message || (prompt ? subjectFrom(prompt) : autoMessage(staged));
   const commit = git("commit", "-m", subject, "-m", SHIP_TRAILER);
   if (!commit.ok) die(`commit failed:\n${commit.out}`);
