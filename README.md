@@ -37,18 +37,29 @@ autogit wires itself into your agents' lifecycle hooks once, per machine. After 
 
 ## 🚀 Quick start
 
-### 1 · Install (once per machine)
+### Claude Code — install as a plugin (recommended)
+
+```
+/plugin marketplace add mjenkinsx9/mjenkins-toolbox
+/plugin install autogit@mjenkins-toolbox
+```
+
+The plugin wires the hooks automatically — no `autogit setup`, no edits to `~/.claude/settings.json`, and disabling the plugin unwires everything. Then opt in per repo:
+
+```
+/autogit on
+```
+
+(`/autogit status`, `/autogit undo`, `/autogit off`, `/autogit flush`, and `/autogit dry-run` are also available.) Requires `node` on PATH — without it the hooks silently no-op.
+
+### Any agent — install the CLI
 
 ```bash
 git clone https://github.com/mjenkinsx9/autogit && cd autogit && npm link
 autogit setup
 ```
 
-`setup` wires the lifecycle hooks for every agent it finds — Claude Code, Codex, Cursor, and Pi. Run `autogit teardown` any time to unwire them all.
-
-> The upstream npm package (`@davidondrej/autogit`) is the original 0.4.x — this fork's hardened build is install-from-source until it's published.
-
-### 2 · Enable it per repo
+`setup` wires the lifecycle hooks for every agent it finds — Claude Code, Codex, Cursor, and Pi. Run `autogit teardown` any time to unwire them all. Then enable per repo:
 
 ```bash
 cd your-project
@@ -57,13 +68,17 @@ autogit on
 
 Done. Every agent turn in this repo now ships. Repos without `autogit on` are never touched.
 
+> Don't double up: if you install the Claude Code plugin AND run `autogit setup`, the plugin detects the global wiring and stands down, so turns never ship twice.
+>
+> The upstream npm package (`@davidondrej/autogit`) is the original 0.4.x — this fork's hardened build is install-from-source until it's published.
+
 macOS and Linux. Windows is unsupported — the hook commands are POSIX shell.
 
 ## 🤖 Supported agents
 
 | Agent | After `autogit setup` |
 | --- | --- |
-| **Claude Code** | works immediately |
+| **Claude Code** | works immediately — or skip `setup` entirely and use the plugin (see Quick start) |
 | **Cursor** | works immediately — local + worktree agents (cloud agents don't fire stop hooks yet) |
 | **Pi** | works immediately |
 | **Codex** | one-time approval: restart open sessions, then run `/hooks` in `codex` and trust autogit (needs ≥ 0.124) — covers the CLI, the Codex desktop app, and the IDE extension |
@@ -160,6 +175,7 @@ For contributors, human or AI. The implementation is a reference of product inte
 - One helper, `remoteBranchFor(config, localBranch)`, decides the push target for both `ship` and `undo`: `autogit/<branch>` in PR mode, otherwise the configured or current branch.
 - `autogit setup` wires lifecycle hooks globally: Claude Code `Stop` (`~/.claude/settings.json`), Codex `Stop` (`~/.codex/hooks.json`, ≥0.124, one-time `/hooks` trust), Cursor `stop` (`~/.cursor/hooks.json`, lowercase events + `version: 1`), and a Pi extension (`~/.pi/agent/extensions/autogit.ts`, fires on `agent_end`). All JSON configs merge through one helper; Claude/Codex share the same `Stop` entry shape.
 - `autogit teardown` (added 2026-06-11) reverses `setup` for all four agents: filters autogit entries out of the JSON hook configs, and deletes the Pi extension only if its content is recognizably ours. Idempotent; per-repo configs are untouched.
+- Claude Code plugin wrapper (DECIDED 2026-06-12, same repo — a separate plugin repo would just hold a drifting copy of `index.js`): `.claude-plugin/plugin.json` + `hooks/hooks.json` (Stop → `hooks/ship.sh`, UserPromptSubmit/PostToolUse → `hooks/busy.sh`) + `commands/autogit.md` → `skills/autogit-ops/SKILL.md` (anchor-style dispatch — `${CLAUDE_PLUGIN_ROOT}` expands in hook commands but NOT in command markdown, so the skill resolves the plugin root from its own file path). The hook scripts are fail-soft (no `node` on PATH → silent exit 0) and stand down when `~/.claude/settings.json` already contains `autogit ship`/`autogit busy` entries from a global `setup` (double-wiring guard). Distributed via the mjenkins-toolbox marketplace; npm `files` whitelist keeps plugin dirs out of any npm publish; `plugin.json` version must match `package.json` (tested).
 - Codex legacy `notify` is NOT used (single-slot, often taken by other tools; an upstream deprecation was attempted and reverted in 0.129). Codex hook commands run in the session `cwd`, unsandboxed, via `$SHELL -lc` — so `git push` has network and the user's PATH.
 - Codex surfaces (verified 2026-06-10): the desktop app and IDE extension run the same CLI core and execute the same `~/.codex/hooks.json`; cloud tasks never fire local hooks, and `codex exec` hook dispatch is broken upstream (openai/codex#26452). Trust is hash-based — any change to the wired commands silently un-trusts them until the user re-runs `/hooks`; editing hooks.json mid-session disables hooks until Codex restarts (#21160). Esc-interrupted turns fire no `Stop`; that turn's changes ship with the next one (busy-marker TTL self-heals).
 - `ship` reads an optional JSON payload from stdin (all hook systems pipe one): Cursor's carries `workspace_roots` (its hooks run from `~/.cursor`, not the project — multi-root workspaces ship every opted-in root) and `status` (`ship` only proceeds on `completed`, so aborted/errored turns never push). Claude/Codex payloads lack these fields and fall through to cwd behavior.
