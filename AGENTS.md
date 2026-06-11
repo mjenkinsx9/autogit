@@ -11,7 +11,7 @@ Everything about the project — what it is, architecture, internals, roadmap �
 
 ## Working rules
 
-- **NEVER publish to npm yourself** — no `npm publish`, ever (it's behind 2FA anyway). When a release is ready, ask David (the human) to publish: give clear & concise instructions plus the exact terminal command in a code block.
+- **NEVER publish to npm yourself** — no `npm publish`, ever. When a release is ready, ask Mike (the human owner) to publish: give clear & concise instructions plus the exact terminal command in a code block. (The package also needs a rename first — `@davidondrej/autogit` is the upstream author's scope.)
 - Keep it minimal: small files, zero dependencies, simplest thing that works.
 - Treat the implementation as a reference of product intent, not fixed architecture.
 - Confirm any major structural change with the owner before implementing.
