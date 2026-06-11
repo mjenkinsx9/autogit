@@ -1,30 +1,65 @@
-# autogit
+<div align="center">
 
-<!-- User-facing flow up top; contributor internals below. -->
+# 🚢 autogit
 
-Your AI coding agent writes the code. **autogit ships it.**
+### Your AI coding agent writes the code — autogit ships it
 
-When your agent finishes a turn, autogit stages, commits, and pushes — automatically.
+**When your agent finishes a turn, autogit stages, scans, commits, and pushes. Automatically. Claude Code, Codex, Cursor, and Pi.**
 
-## Quick start
+[![CI](https://github.com/mjenkinsx9/autogit/actions/workflows/ci.yml/badge.svg)](https://github.com/mjenkinsx9/autogit/actions/workflows/ci.yml)
+![Node](https://img.shields.io/badge/node-%E2%89%A518-339933?logo=nodedotjs&logoColor=white)
+![Dependencies](https://img.shields.io/badge/dependencies-zero-blue)
+![Tests](https://img.shields.io/badge/tests-73_passing-brightgreen)
+![Agents](https://img.shields.io/badge/agents-Claude_Code_%7C_Codex_%7C_Cursor_%7C_Pi-d97757)
+![Platform](https://img.shields.io/badge/platform-macos%20%7C%20linux-lightgrey)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+
+</div>
+
+---
+
+autogit wires itself into your agents' lifecycle hooks once, per machine. After that, every agent turn in an opted-in repo ends with **stage → secrets scan → commit → push** — and `git log` reads like the instructions you gave your agent, because the turn's prompt becomes the commit subject.
+
+> **Credit:** autogit began as [davidondrej/autogit](https://github.com/davidondrej/autogit) by David Ondrej — all credit to him for the idea and the original MVP. This repo is a heavily reworked fork (v0.5.0): per-clone config that can't leak to teammates, fail-closed safety, quiet batching, PR mode, and a full test suite.
+
+## ✨ What's inside
+
+| | Feature | What it does |
+|---|---|---|
+| 🚢 | **Auto-ship** | Every agent turn ends with stage → scan → commit → push — zero ceremony |
+| ✉️ | **Prompts as commit messages** | The subject is what you asked your agent to do; "yes"-type replies and slash commands never make it in |
+| 🔐 | **Secrets gate** | Pattern scan over the staged diff (Anthropic, OpenAI, AWS, GitHub, GitLab, Stripe, npm, Slack, Google, key files, JWTs…) blocks the push and unstages — fail-closed |
+| ↩️ | **One-command undo** | `autogit undo` rewinds the remote *and* the local commit, leaving your changes back in the working tree |
+| ⏱️ | **Quiet batching** | `"quiet": "5m"` accumulates turns and ships one commit after the repo goes quiet |
+| 🔀 | **PR mode** | `"pr": true` pushes to `autogit/<branch>` and auto-opens a pull request via `gh` |
+| 🤝 | **Parallel-agent aware** | Busy markers make simultaneous agents take turns; worktrees stay fully isolated |
+| 🛡️ | **Fail-safe by design** | Hooks never disturb the agent; failed pushes are remembered and retried; merge/rebase states are never touched |
+
+## 🚀 Quick start
+
+### 1 · Install (once per machine)
 
 ```bash
-# 1. Install (once per machine)
-npm install -g @davidondrej/autogit
+git clone https://github.com/mjenkinsx9/autogit && cd autogit && npm link
 autogit setup
+```
 
-# 2. Enable it per repo
+`setup` wires the lifecycle hooks for every agent it finds — Claude Code, Codex, Cursor, and Pi. Run `autogit teardown` any time to unwire them all.
+
+> The upstream npm package (`@davidondrej/autogit`) is the original 0.4.x — this fork's hardened build is install-from-source until it's published.
+
+### 2 · Enable it per repo
+
+```bash
 cd your-project
 autogit on
 ```
 
-Done. Every agent turn now ends with: **stage → secrets scan → commit → push.**
-
-> From source instead: `git clone https://github.com/davidondrej/autogit && cd autogit && npm link`
+Done. Every agent turn in this repo now ships. Repos without `autogit on` are never touched.
 
 macOS and Linux. Windows is unsupported — the hook commands are POSIX shell.
 
-## Supported agents
+## 🤖 Supported agents
 
 | Agent | After `autogit setup` |
 | --- | --- |
@@ -35,7 +70,7 @@ macOS and Linux. Windows is unsupported — the hook commands are POSIX shell.
 
 > Hooks fire for local agent sessions. Delegated/cloud runs (Cursor cloud agents, Codex cloud tasks) and `codex exec` don't fire them yet — upstream limitations. Codex re-asks for `/hooks` trust whenever autogit updates its hook entries.
 
-## Commands
+## 📟 Commands
 
 ```
 autogit setup     Wire up agent hooks (once per machine)
@@ -48,13 +83,13 @@ autogit status    Show hooks + repo state (including pending batches)
 autogit --version Print the installed version (-v)
 ```
 
-**`ship` flags**: `-m "message"` sets the commit subject. `--force-secrets` pushes past a diff-scan block. `--dry-run` runs the whole pipeline — stages, scans, computes the subject and push target — then reports what would happen and unstages everything. Note: dry-run (like `ship` itself) runs `git add -A` + `git reset`, so it clears any manual staging selection. `--flush` ships a pending batch immediately (see Batching).
+**`ship` flags**: `-m "message"` sets the commit subject. `--force-secrets` pushes past a diff-scan block. `--dry-run` runs the whole pipeline — stages, scans, computes the subject and push target — then reports what would happen and unstages everything. Note: dry-run (like `ship` itself) runs `git add -A` + `git reset`, so it clears any manual staging selection. `--flush` ships a pending batch immediately (see Batching below).
 
 **Commit messages**: `autogit ship -m "message"` uses your message. Without `-m`, the subject is the prompt you gave your agent that turn (so `git log` reads like your instructions), falling back to a list of changed files. Two filters apply: a prompt that looks like it contains a secret (pasted API key, token, etc.) is never used — not overridable — and a prompt that wouldn't make a useful subject (short "yes"/"ok"-type replies, slash commands) is skipped for the next candidate, ultimately the file list.
 
 **Undo**: shipped something you regret? `autogit undo` rewinds the remote branch, removes the commit locally, and leaves the changes uncommitted in your working tree — ready to fix and re-ship. Run it again to peel off earlier autogit commits. It refuses to touch commits it didn't make, or remotes that have since moved on.
 
-## Batching
+## ⏱️ Batching
 
 By default every turn ships. Set `quiet` in the config to batch instead:
 
@@ -68,13 +103,13 @@ Turns accumulate, and autogit ships once the repo has been quiet — no agent tu
 
 No daemon: each turn spawns a short-lived detached timer, and if a timer ever dies the next ship notices the aged batch and flushes it as a backstop.
 
-## PR mode
+## 🔀 PR mode
 
 Set `pr: true` and autogit pushes to `autogit/<branch>` instead of `<branch>`. If `gh` is installed, it auto-opens a pull request (and leaves an already-open one alone on later ships); without `gh` the push still lands, with a note. `autogit undo` rewinds the PR branch. Your local branch still carries the commits — the PR branch is just where they're pushed. (Undo reads the config to know which branch to rewind, so undo a PR-mode ship *before* running `autogit off`.)
 
 PR mode and `quiet` compose freely.
 
-## Configuration
+## ⚙️ Configuration
 
 `autogit on` writes `autogit.json` into the git common dir — `.git/autogit.json` in a normal clone, shared by all linked worktrees. All keys, with defaults:
 
@@ -89,7 +124,7 @@ PR mode and `quiet` compose freely.
 }
 ```
 
-## Safety
+## 🛡️ Safety
 
 - **Opt-in per repo** — repos without `autogit on` are never touched. Config lives in the git dir (`.git/autogit.json`), never committed — enabling autogit can't silently opt in your teammates. (A legacy root `.autogit.json` is still honored; `autogit on` migrates it.)
 - **No silent losses** — a failed push leaves a marker and is retried on later turns (`status` shows it); a failed or blinded secrets scan blocks instead of passing; a failed `git add` is a visible error, not "nothing changed".
@@ -99,15 +134,15 @@ PR mode and `quiet` compose freely.
 - **No noise** — nothing changed means nothing shipped. Aborted or errored Cursor turns never ship.
 - **Parallel-agent aware** — if another agent is still mid-task in the same repo, autogit waits its turn: the last agent to finish ships everything. (For fully separate commits per agent, use worktrees — autogit handles each independently.)
 
-## Development
+## 🧪 Development
 
 ```bash
 npm test    # node --test test/*.test.js
 ```
 
-Node 18+, zero dev dependencies — tests use the built-in `node:test` runner. CI runs them on Node 18/20/22 across Linux and macOS.
+Node 18+, zero dev dependencies — tests use the built-in `node:test` runner (73 tests). CI runs them on Node 18/20/22 across Linux and macOS.
 
-## Internals
+## 🔧 Internals
 
 For contributors, human or AI. The implementation is a reference of product intent, not fixed architecture.
 
@@ -116,7 +151,7 @@ For contributors, human or AI. The implementation is a reference of product inte
 - Single zero-dependency Node.js CLI: `index.js`, ESM, Node ≥18.
 - Commands: `setup`, `teardown`, `on`, `off`, `ship`, `undo`, `busy`, `status`, plus `-v`/`--version` (read from `package.json`, also shown by `status`).
 - One mode for now (DECIDED 2026-06-10): **auto** — ship immediately, no review gate. Review modes are on the roadmap.
-- npm name (DECIDED 2026-06-10): **`@davidondrej/autogit`** — unscoped `autogit`/`autogit-cli` taken; `auto-git` rejected by npm's name-similarity rule. The installed binary stays `autogit`. Scoped packages need `npm publish --access=public`.
+- npm name (DECIDED 2026-06-10, upstream): **`@davidondrej/autogit`** — unscoped `autogit`/`autogit-cli` taken; `auto-git` rejected by npm's name-similarity rule. The installed binary stays `autogit`. Scoped packages need `npm publish --access=public`. This fork is unpublished; a rename is needed before publishing.
 - Per-repo opt-in is the safety model: `autogit on` writes the config; without it, `ship` is a silent no-op (exit 0). Only enable it where aggressive auto-push is OK.
 - Config lives at `<git-common-dir>/autogit.json` (DECIDED 2026-06-11): the old root `.autogit.json` was contagious — `git add -A` committed it, so one user running `autogit on` silently enabled auto-push for every collaborator who'd run `setup`. The git dir can't be committed. Common dir = one config per clone, shared by all worktrees. Legacy root files are still read (with a stderr nudge on ship); `autogit on` deletes and migrates them — and warns if the legacy file was tracked, since its deletion ships with the next turn. `autogit off` deletes both locations.
 - Exit-code contract (DECIDED 2026-06-11, now explicit): 0 = shipped or clean no-op; 1 = real failure (bad config JSON, secrets block, commit/push failure, detached HEAD, undo failures); NEVER 2. All human output on stderr, except `status`/`setup`/`teardown`/help/version reports on stdout.
@@ -168,13 +203,15 @@ Escape hatch for bad auto-pushes; one commit per run, repeatable. Refuses unless
 - Nothing staged → no commit, no push, no noise.
 - Multi-root ships keep going past a failed root; the exit code reports the failure at the end.
 
-## Roadmap
+## 🗺️ Roadmap
 
 Owner-gated — don't build these without a go-ahead.
 
-- **agent mode** — an LLM reviews the diff before push, for more serious repos. Owner decision 2026-06-09: the *currently-running* agent should review (it has task context), not a separate OpenRouter call. Mechanics TBD.
+- **agent mode** — an LLM reviews the diff before push, for more serious repos. Owner decision 2026-06-09 (upstream): the *currently-running* agent should review (it has task context), not a separate OpenRouter call. Mechanics TBD.
 - **human mode** — terminal y/n prompt on the diff, for production repos. (Existed in the pre-MVP prototype, cut for focus.)
 - More agents in `setup` (Pi added 2026-06-10; Hermes next: `post_llm_call` shell hook in `~/.hermes/config.yaml` + reading `cwd` from stdin JSON in `ship` + user consent flow).
 - Richer PR flows — basic PR mode shipped in 0.5.0 (push to `autogit/<branch>` + auto-open via `gh`); deeper PR integration considered.
 
-MIT
+## 📄 License
+
+[MIT](LICENSE) — original work © David Ondrej, modifications © Mike Jenkins.

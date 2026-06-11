@@ -8,7 +8,7 @@
   "author": "David Ondrej",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/davidondrej/autogit.git"
+    "url": "git+https://github.com/mjenkinsx9/autogit.git"
   },
   "bin": {
     "autogit": "index.js"
