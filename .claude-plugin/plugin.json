@@ -1,0 +1,13 @@
+{
+  "name": "autogit",
+  "displayName": "autogit",
+  "version": "0.6.0",
+  "license": "MIT",
+  "description": "Auto stage → secrets-scan → commit → push after every agent turn, strictly per-repo opt-in (/autogit on). One-command undo, quiet batching, PR mode.",
+  "author": {
+    "name": "Mike Jenkins"
+  },
+  "homepage": "https://github.com/mjenkinsx9/autogit",
+  "repository": "https://github.com/mjenkinsx9/autogit",
+  "keywords": ["git", "automation", "auto-commit", "auto-push", "hooks", "claude-code"]
+}
