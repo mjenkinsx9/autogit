@@ -33,6 +33,23 @@ describe("plugin: manifests", () => {
     assert.equal(p.version, pkg.version);
   });
 
+  it("per-harness manifests keep name/version/description in sync with the canonical one", () => {
+    const base = JSON.parse(read(".claude-plugin/plugin.json"));
+    // Codex, Factory Droid, and Cursor each read their own manifest path but
+    // point at the same skills/ — their metadata must not drift from Claude's.
+    for (const f of [".codex-plugin/plugin.json", ".factory-plugin/plugin.json", ".cursor-plugin/plugin.json"]) {
+      const m = JSON.parse(read(f));
+      assert.equal(m.name, base.name, `${f}: name`);
+      assert.equal(m.version, base.version, `${f}: version`);
+      assert.equal(m.description, base.description, `${f}: description`);
+    }
+  });
+
+  it("Codex and Cursor manifests point skills at the shared ./skills/ directory", () => {
+    assert.equal(JSON.parse(read(".codex-plugin/plugin.json")).skills, "./skills/");
+    assert.equal(JSON.parse(read(".cursor-plugin/plugin.json")).skills, "./skills/");
+  });
+
   it("hooks.json wires Stop→ship.sh and UserPromptSubmit/PostToolUse→busy.sh, and the scripts exist executable", () => {
     const h = JSON.parse(read("hooks/hooks.json")).hooks;
     const cmd = e => h[e][0].hooks[0].command;

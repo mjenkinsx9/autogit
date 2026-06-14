@@ -9,7 +9,7 @@
 [![CI](https://github.com/mjenkinsx9/autogit/actions/workflows/ci.yml/badge.svg)](https://github.com/mjenkinsx9/autogit/actions/workflows/ci.yml)
 ![Node](https://img.shields.io/badge/node-%E2%89%A518-339933?logo=nodedotjs&logoColor=white)
 ![Dependencies](https://img.shields.io/badge/dependencies-zero-blue)
-![Tests](https://img.shields.io/badge/tests-73_passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-83_passing-brightgreen)
 ![Agents](https://img.shields.io/badge/agents-Claude_Code_%7C_Codex_%7C_Cursor_%7C_Pi-d97757)
 ![Platform](https://img.shields.io/badge/platform-macos%20%7C%20linux-lightgrey)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
@@ -73,6 +73,27 @@ Done. Every agent turn in this repo now ships. Repos without `autogit on` are ne
 > The upstream npm package (`@davidondrej/autogit`) is the original 0.4.x — this fork's hardened build is install-from-source until it's published.
 
 macOS and Linux. Windows is unsupported — the hook commands are POSIX shell.
+
+## 🧩 Install as a plugin across harnesses
+
+The Agent Skill at `skills/autogit-ops/SKILL.md` is autogit's portable core — it tells any agent how to find and drive the bundled `index.js`. To make the same repo installable as a native plugin in several agent harnesses, autogit ships one tiny manifest per harness, each pointing at the **same** `skills/` (and, where supported, `commands/`) — no duplicated content. Metadata (`name`/`version`/`description`) is kept in sync across all of them and checked by `test/plugin.test.js`.
+
+| Harness | What ships | Manifest | Status | Docs |
+| --- | --- | --- | --- | --- |
+| **Claude Code** | `skills/` + `commands/` + auto-ship `hooks/` | `.claude-plugin/plugin.json` | ✅ real plugin, validated (`claude plugin validate .`) | [reference](https://code.claude.com/docs/en/plugins-reference) |
+| **OpenAI Codex** | `skills/` | `.codex-plugin/plugin.json` | ✅ real manifest (schema-conformant) | [build](https://developers.openai.com/codex/plugins/build) |
+| **GitHub Copilot CLI** | `skills/` + `commands/` | reuses `.claude-plugin/plugin.json` (documented fallback) | ✅ no new file needed | [reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference) |
+| **Factory Droid** | `skills/` + `commands/` | `.factory-plugin/plugin.json` | ✅ real manifest (schema-conformant) | [reference](https://docs.factory.ai/cli/configuration/plugins) |
+| **Cursor** | `skills/` + `commands/` | `.cursor-plugin/plugin.json` | ✅ real manifest (schema-conformant) | [reference](https://cursor.com/docs/reference/plugins) |
+| **Gemini CLI** | — | — | 📄 documented gap (no skills primitive; MCP-centric) | [docs/gemini.md](docs/gemini.md) |
+| **OpenCode** | reference plugin | — | 📄 reference impl, unvalidated (JS module, no manifest) | [docs/opencode.md](docs/opencode.md) |
+
+Notes:
+
+- **Claude Code** is the only harness whose plugin also wires the **automatic after-every-turn shipping** (via `hooks/hooks.json`). Those hook scripts use Claude's event names and `${CLAUDE_PLUGIN_ROOT}`, so they are not shared into the other manifests. On Codex, Cursor, and Pi the automatic shipping comes from `autogit setup` instead (see [Any agent — install the CLI](#any-agent--install-the-cli)); the per-harness manifests add the `/autogit` **control surface** (`on`/`off`/`status`/`undo`/…) that `autogit setup` alone doesn't provide.
+- **Copilot CLI** reads `.claude-plugin/plugin.json` as one of its documented manifest locations (it checks `.plugin/plugin.json`, `plugin.json`, `.github/plugin/plugin.json`, then `.claude-plugin/plugin.json`), so no extra file is needed.
+- **Codex marketplace listing:** a Codex catalog lists plugins from `.agents/plugins/marketplace.json` with `source.path` entries — that file lives in the **catalog** repo, not here.
+- **Gemini CLI** and **OpenCode** are honest gaps: a faithful port needs real, runtime-tested work (a Gemini turn-end hook; an OpenCode JS event plugin) that couldn't be validated here. See the linked docs for exactly what each would take, including a copy-pasteable OpenCode reference plugin.
 
 ## 🤖 Supported agents
 
@@ -155,7 +176,7 @@ PR mode and `quiet` compose freely.
 npm test    # node --test test/*.test.js
 ```
 
-Node 18+, zero dev dependencies — tests use the built-in `node:test` runner (73 tests). CI runs them on Node 18/20/22 across Linux and macOS.
+Node 18+, zero dev dependencies — tests use the built-in `node:test` runner (83 tests). CI runs them on Node 18/20/22 across Linux and macOS.
 
 ## 🔧 Internals
 
@@ -176,6 +197,7 @@ For contributors, human or AI. The implementation is a reference of product inte
 - `autogit setup` wires lifecycle hooks globally: Claude Code `Stop` (`~/.claude/settings.json`), Codex `Stop` (`~/.codex/hooks.json`, ≥0.124, one-time `/hooks` trust), Cursor `stop` (`~/.cursor/hooks.json`, lowercase events + `version: 1`), and a Pi extension (`~/.pi/agent/extensions/autogit.ts`, fires on `agent_end`). All JSON configs merge through one helper; Claude/Codex share the same `Stop` entry shape.
 - `autogit teardown` (added 2026-06-11) reverses `setup` for all four agents: filters autogit entries out of the JSON hook configs, and deletes the Pi extension only if its content is recognizably ours. Idempotent; per-repo configs are untouched.
 - Claude Code plugin wrapper (DECIDED 2026-06-12, same repo — a separate plugin repo would just hold a drifting copy of `index.js`): `.claude-plugin/plugin.json` + `hooks/hooks.json` (Stop → `hooks/ship.sh`, UserPromptSubmit/PostToolUse → `hooks/busy.sh`) + `commands/autogit.md` → `skills/autogit-ops/SKILL.md` (anchor-style dispatch — `${CLAUDE_PLUGIN_ROOT}` expands in hook commands but NOT in command markdown, so the skill resolves the plugin root from its own file path). The hook scripts are fail-soft (no `node` on PATH → silent exit 0) and stand down when `~/.claude/settings.json` already contains `autogit ship`/`autogit busy` entries from a global `setup` (double-wiring guard). Distributed via the mjenkins-toolbox marketplace; npm `files` whitelist keeps plugin dirs out of any npm publish; `plugin.json` version must match `package.json` (tested).
+- Multi-harness plugin manifests (DECIDED 2026-06-14): the same repo is installable as a native plugin in several harnesses by shipping one tiny metadata manifest each, all pointing at the **shared** `skills/` (and `commands/` where supported) — no duplicated skill content. Added `.codex-plugin/plugin.json` (`skills: "./skills/"`), `.cursor-plugin/plugin.json` (`skills` + `commands`), and `.factory-plugin/plugin.json` (name/description/version; Factory auto-discovers `skills/`/`commands/`). Copilot CLI needs no file — it reads `.claude-plugin/plugin.json` as a documented fallback manifest location. Only Claude's manifest carries the auto-ship `hooks/` (Claude-specific event names + `${CLAUDE_PLUGIN_ROOT}`); the other harnesses get auto-ship from `autogit setup` and the manifest just adds the `/autogit` control surface. `test/plugin.test.js` asserts all manifests' `name`/`version`/`description` stay in sync with `.claude-plugin/plugin.json`. Gemini CLI (no skills primitive; MCP-centric) and OpenCode (JS module, no manifest) are documented gaps in `docs/gemini.md` and `docs/opencode.md` rather than faked — a faithful port of each needs runtime-tested work no harness CLI in this env could validate.
 - Codex legacy `notify` is NOT used (single-slot, often taken by other tools; an upstream deprecation was attempted and reverted in 0.129). Codex hook commands run in the session `cwd`, unsandboxed, via `$SHELL -lc` — so `git push` has network and the user's PATH.
 - Codex surfaces (verified 2026-06-10): the desktop app and IDE extension run the same CLI core and execute the same `~/.codex/hooks.json`; cloud tasks never fire local hooks, and `codex exec` hook dispatch is broken upstream (openai/codex#26452). Trust is hash-based — any change to the wired commands silently un-trusts them until the user re-runs `/hooks`; editing hooks.json mid-session disables hooks until Codex restarts (#21160). Esc-interrupted turns fire no `Stop`; that turn's changes ship with the next one (busy-marker TTL self-heals).
 - `ship` reads an optional JSON payload from stdin (all hook systems pipe one): Cursor's carries `workspace_roots` (its hooks run from `~/.cursor`, not the project — multi-root workspaces ship every opted-in root) and `status` (`ship` only proceeds on `completed`, so aborted/errored turns never push). Claude/Codex payloads lack these fields and fall through to cwd behavior.
