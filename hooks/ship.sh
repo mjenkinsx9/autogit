@@ -31,8 +31,11 @@ case "$harness" in
 esac
 [ -n "$guard" ] && grep -qs "autogit ship" "$guard" && exit 0
 
-# Plugin hooks usually run in the session cwd; be defensive like global wiring.
-cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
+# Plugin hooks usually run in the session cwd, but some harnesses run them from
+# elsewhere and expose the project root in an env var (Claude: CLAUDE_PROJECT_DIR,
+# Factory: FACTORY_PROJECT_DIR — its docs warn the hook cwd may differ). Cursor
+# carries workspace_roots in the stdin payload, which `ship` reads itself.
+cd "${CLAUDE_PROJECT_DIR:-${FACTORY_PROJECT_DIR:-.}}" 2>/dev/null || exit 0
 
 # The plugin root is this script's parent dir — resolved from its own path, so
 # it works no matter which harness variable located the script (or none).

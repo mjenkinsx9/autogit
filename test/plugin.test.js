@@ -213,4 +213,20 @@ describe("plugin: hook scripts", () => {
     assert.equal(r.status, 0, r.stderr);
     assert.equal(remoteSha(bare, "main"), headSha(repo), "Factory hook must ship despite Claude global wiring");
   });
+
+  it("ship.sh honors FACTORY_PROJECT_DIR when the hook runs outside the repo", () => {
+    // Factory warns its hook cwd may differ from the project root; ship must cd
+    // into FACTORY_PROJECT_DIR rather than no-op against an unrelated cwd.
+    const { repo, bare } = makeRepo();
+    const home = makeTempDir();
+    const elsewhere = makeTempDir(); // hook fires from here, not the repo
+    enable(repo);
+    writeFileSync(path.join(repo, "f.txt"), "f\n");
+    const r = spawnSync("bash", [path.join(pluginRoot, "hooks", "ship.sh"), "claude"], {
+      cwd: elsewhere, input: JSON.stringify({ session_id: "droid2" }), encoding: "utf8",
+      env: { PATH: process.env.PATH, HOME: home, DROID_PLUGIN_ROOT: pluginRoot, FACTORY_PROJECT_DIR: repo }
+    });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(remoteSha(bare, "main"), headSha(repo), "ship must reach the repo via FACTORY_PROJECT_DIR");
+  });
 });

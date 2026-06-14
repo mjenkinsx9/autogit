@@ -17,7 +17,8 @@ case "$harness" in
 esac
 [ -n "$guard" ] && grep -qs "autogit busy" "$guard" && exit 0
 
-cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
+# Honor the harness's project-root var (Claude/Factory) — see ship.sh.
+cd "${CLAUDE_PROJECT_DIR:-${FACTORY_PROJECT_DIR:-.}}" 2>/dev/null || exit 0
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 exec node "$ROOT/index.js" busy
