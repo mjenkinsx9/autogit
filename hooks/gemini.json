@@ -1,12 +1,12 @@
 {
-  "_comment": "Gemini CLI auto-ship hooks — NOT active in this repo. Gemini only auto-discovers hooks/hooks.json from the extension root, but Claude Code also reads that root file and its loader rejects Gemini's AfterAgent/BeforeAgent/AfterTool event keys (claude plugin validate fails), so the two cannot share one repo (see docs/gemini.md). This file is therefore a ready-to-use template: for a Gemini-ONLY install of autogit, copy it to hooks/hooks.json in the extension root. ${extensionPath} is Gemini's extension-directory variable; ship.sh/busy.sh re-derive the real root from their own path regardless.",
+  "_comment": "Gemini CLI auto-ship hooks — NOT active in this repo. Gemini only auto-discovers hooks/hooks.json from the extension root, but Claude Code also reads that root file and its loader rejects Gemini's AfterAgent/BeforeAgent/AfterTool event keys (claude plugin validate fails), so the two cannot share one repo (see docs/gemini.md). This file is therefore a ready-to-use template: for a Gemini-ONLY install of autogit, copy it to hooks/hooks.json in the extension root. ${extensionPath} is Gemini's literal substitution token for the extension directory (Gemini does exact-token replacement, not shell expansion, so no :- default is used); ship.sh/busy.sh re-derive the real root from their own path regardless.",
   "hooks": {
     "AfterAgent": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "\"${extensionPath:-.}/hooks/ship.sh\" gemini"
+            "command": "\"${extensionPath}/hooks/ship.sh\" gemini"
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${extensionPath:-.}/hooks/busy.sh\" gemini"
+            "command": "\"${extensionPath}/hooks/busy.sh\" gemini"
           }
         ]
       }
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${extensionPath:-.}/hooks/busy.sh\" gemini"
+            "command": "\"${extensionPath}/hooks/busy.sh\" gemini"
           }
         ]
       }
