@@ -5,8 +5,11 @@
 # stdout into model context). $1 names the harness (see ship.sh).
 command -v node >/dev/null 2>&1 || exit 0
 
-# Double-wiring guard — mirror of ship.sh (see there).
-case "${1:-claude}" in
+# Double-wiring guard — mirror of ship.sh (see there). Factory shares the root
+# hooks.json with Claude (arg `claude`); disambiguate by its own env var.
+harness="${1:-claude}"
+[ -n "$DROID_PLUGIN_ROOT" ] && harness="factory"
+case "$harness" in
   claude) guard="$HOME/.claude/settings.json" ;;
   codex)  guard="$HOME/.codex/hooks.json" ;;
   cursor) guard="$HOME/.cursor/hooks.json" ;;

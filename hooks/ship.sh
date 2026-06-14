@@ -17,7 +17,13 @@ command -v node >/dev/null 2>&1 || exit 0
 # wiring wins — skip the plugin copy so a turn never ships twice. Only the
 # harness named in $1 has a global config to clash with (setup wires
 # Claude/Codex/Cursor); Factory/Gemini have none, so nothing to guard.
-case "${1:-claude}" in
+#
+# The root hooks.json is shared by Claude and Factory and always passes
+# `claude`; disambiguate by Factory's own env var so a Factory turn never
+# stands down just because a Claude global hook exists on the same machine.
+harness="${1:-claude}"
+[ -n "$DROID_PLUGIN_ROOT" ] && harness="factory"
+case "$harness" in
   claude) guard="$HOME/.claude/settings.json" ;;
   codex)  guard="$HOME/.codex/hooks.json" ;;
   cursor) guard="$HOME/.cursor/hooks.json" ;;

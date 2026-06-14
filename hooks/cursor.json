@@ -2,13 +2,13 @@
   "version": 1,
   "hooks": {
     "stop": [
-      { "command": "./hooks/ship.sh cursor" }
+      { "command": "\"${CURSOR_PLUGIN_ROOT:-.}/hooks/ship.sh\" cursor" }
     ],
     "beforeSubmitPrompt": [
-      { "command": "./hooks/busy.sh cursor" }
+      { "command": "\"${CURSOR_PLUGIN_ROOT:-.}/hooks/busy.sh\" cursor" }
     ],
     "postToolUse": [
-      { "command": "./hooks/busy.sh cursor" }
+      { "command": "\"${CURSOR_PLUGIN_ROOT:-.}/hooks/busy.sh\" cursor" }
     ]
   }
 }
