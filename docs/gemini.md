@@ -14,7 +14,7 @@ reused (not duplicated), same as every other harness.
 ```json
 {
   "name": "autogit",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Auto stage → secrets-scan → commit → push after every agent turn, …"
 }
 ```
