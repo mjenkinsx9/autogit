@@ -11,8 +11,8 @@
   "hooks": "./hooks/codex.json",
   "interface": {
     "displayName": "autogit",
-    "shortDescription": "Auto-commit and push opted-in agent work.",
-    "longDescription": "autogit stages, scans, commits, and pushes changes after agent turns in repositories where you explicitly opt in, with one-command undo, quiet batching, and PR mode.",
+    "shortDescription": "Auto-stage, scan, commit, and push opted-in agent work.",
+    "longDescription": "autogit stages, scans, commits, and pushes after every agent turn in repositories where you explicitly opt in, with one-command undo, quiet batching, and PR mode.",
     "developerName": "Mike Jenkins",
     "category": "Developer Tools",
     "capabilities": ["Interactive", "Read", "Write"],
@@ -21,7 +21,7 @@
       "Check autogit status.",
       "Undo the last autogit ship."
     ],
-    "websiteURL": "https://github.com/mjenkinsx9/autogit",
+    "websiteUrl": "https://github.com/mjenkinsx9/autogit",
     "brandColor": "#DC2626"
   }
 }
