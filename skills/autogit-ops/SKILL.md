@@ -22,7 +22,7 @@ directory).
 
 | Argument | Run | Notes |
 |---|---|---|
-| `on` | `node .../index.js on` | Enables auto-push for this repo (writes `.git/autogit.json`). After it succeeds, tell the user this repo is now opted in — every turn ends with stage → secrets scan → commit → push **once autogit's lifecycle hooks are wired for the agent you're running**. The Claude Code plugin wires them automatically, so there `on` is all that's needed; on other harnesses (Cursor, Codex, Factory, Gemini) the hooks come from a one-time `autogit setup` (`node .../index.js setup`). If `setup` hasn't run on a non-Claude agent, `on` only writes the config and turns won't ship until the hooks exist. `quiet` and `pr` config keys go in `.git/autogit.json`. |
+| `on` | `node .../index.js on` | Enables auto-push for this repo (writes `.git/autogit.json`). After it succeeds, tell the user this repo is now opted in — every turn ends with stage → secrets scan → commit → push **once autogit's lifecycle hooks are wired for the agent you're running**. As a plugin, autogit wires those hooks itself on Claude Code, Codex, Cursor, and Factory Droid, so there `on` is all that's needed. **Gemini** gets this skill but not the plugin's auto-ship hook (a harness limitation — see the plugin's `docs/gemini.md`), so on Gemini automatic shipping needs a one-time `autogit setup` (`node .../index.js setup`) or manual `ship`. `quiet` and `pr` config keys go in `.git/autogit.json`. |
 | `off` | `node .../index.js off` | Disables auto-push for this repo. |
 | `status` (default) | `node .../index.js status` | Also the no-args behavior. Surface pending batches and failed-push lines prominently if present. |
 | `undo` | `node .../index.js undo` | Rewinds the last autogit commit on the remote and locally; changes return uncommitted. Repeatable. It refuses non-autogit commits on its own — no extra confirmation needed. |
@@ -38,12 +38,12 @@ directory).
 - If `node` is missing from PATH, say so — the plugin's automatic hooks
   silently no-op without Node, so nothing has been shipping.
 - Automatic ship-after-every-turn depends on autogit's lifecycle hooks being
-  wired for the running agent. The **Claude Code plugin** wires them itself, so
-  there `on` per repo is all that's needed. On **every other** harness (Cursor,
-  Codex, Factory Droid, Gemini) this plugin supplies the `/autogit` control
-  surface, but the automatic shipping comes from a one-time `autogit setup`
-  (`node .../index.js setup`), not from the plugin. If a user on a non-Claude
-  agent runs `on` and turns still aren't shipping, check that `autogit setup`
-  has been run.
+  wired for the running agent. The plugin wires them itself on **Claude Code,
+  Codex, Cursor, and Factory Droid**, so on those `on` per repo is all that's
+  needed (the non-Claude wiring is conformant to each harness's docs but hasn't
+  been run end-to-end — if a turn doesn't ship, that's the place to check). On
+  **Gemini** the plugin exposes this skill but cannot wire auto-ship (a harness
+  limitation, see `docs/gemini.md`), so there automatic shipping needs
+  `autogit setup` or a manual `ship`.
 - If the user asks for anything else (custom commit message, force past a
   secrets block), the flags are `-m "msg"` and `--force-secrets` on `ship`.

@@ -1,0 +1,35 @@
+{
+  "_comment": "Codex plugin hooks. Referenced from .codex-plugin/plugin.json, which makes Codex use this file instead of the default hooks/hooks.json. Same event schema as Claude; Codex exposes ${PLUGIN_ROOT} (and ${CLAUDE_PLUGIN_ROOT} for compatibility). The 'codex' argument points ship.sh/busy.sh's double-wiring guard at ~/.codex/hooks.json.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-.}}/hooks/ship.sh\" codex"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-.}}/hooks/busy.sh\" codex"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-.}}/hooks/busy.sh\" codex"
+          }
+        ]
+      }
+    ]
+  }
+}

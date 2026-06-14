@@ -38,26 +38,37 @@ Then drive it from the agent the same way as elsewhere — invoke the
 `autogit-ops` skill to run `on` / `off` / `status` / `undo` / `ship` against the
 current repo (the skill resolves the bundled `index.js` from its own path).
 
-## The remaining gap: automatic after-every-turn shipping
+## The remaining gap: automatic after-every-turn shipping is *blocked*, not just unported
 
 The Gemini extension delivers the **skill control surface**, not the
-**automatic** stage→scan→commit→push after every turn. That automation is a
-lifecycle hook, and it is the one piece that does not yet carry over:
+**automatic** stage→scan→commit→push after every turn. Unlike Codex/Cursor/
+Factory — which this plugin *does* wire with native hooks — Gemini's auto-ship
+is blocked by a hard, structural conflict with Claude Code. Here is the exact
+reasoning, because it is not obvious:
 
-- autogit's existing `hooks/hooks.json` is Claude-format (events `Stop` /
-  `UserPromptSubmit` / `PostToolUse`, command interpolation via
-  `${CLAUDE_PLUGIN_ROOT}`) and does not run under Gemini as-is.
-- Gemini extensions can ship a `hooks/hooks.json`, but the public reference does
-  not yet pin down the turn-completion event name, payload shape, or the
-  environment a hook command receives — and there is no Gemini CLI in this
-  repo's build/CI environment to verify a port against. Faking a hook config we
-  can't test would be dishonest, so it's left out.
+1. **Gemini's hook events are known.** Gemini fires `BeforeAgent` (prompt
+   submitted), `AfterAgent` (once per turn after the final response), and
+   `AfterTool`. So a Gemini-native auto-ship hook is straightforward to write —
+   `AfterAgent` → ship, `BeforeAgent`/`AfterTool` → busy marker.
+2. **But Gemini only reads hooks from the root `hooks/hooks.json`.** There is no
+   manifest field to point it elsewhere (`gemini-extension.json` does not
+   declare hooks; they are auto-discovered).
+3. **Claude Code also hard-reads that same root `hooks/hooks.json`** — and its
+   loader/validator *rejects* unknown event keys. `claude plugin validate .`
+   fails with `hooks.AfterAgent: Invalid key in record` the moment Gemini's
+   events are added to the shared file. Pointing Claude's manifest at a
+   different hook file does **not** help: Claude still validates and loads the
+   root file.
+4. **So the two cannot coexist.** Claude needs the root file to contain only its
+   own event names; Gemini needs the root file to contain its (different) event
+   names; neither can read from anywhere else. One repo can't satisfy both.
 
-This mirrors the other non-Claude harnesses (Codex, Cursor, Factory): the
-plugin/extension adds the `/autogit` control surface, and automatic shipping is
-expected to come from `autogit setup` once Gemini is added to its wiring (see
-the Roadmap in the README) or from a Gemini-native turn-end hook once that
-event is documented and testable.
+Rather than break Claude Code (the primary, runtime-validated harness) or fake
+an untested Gemini hook, autogit ships Gemini's **skill** and leaves Gemini's
+auto-ship to `autogit setup` once Gemini is added to its wiring (see the Roadmap
+in the README). A standalone Gemini-only distribution (no Claude manifest in the
+root) *could* carry the `AfterAgent` hooks; that's a packaging split, not a code
+gap.
 
 Until then, the harness-agnostic path also works:
 

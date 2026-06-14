@@ -1,11 +1,12 @@
 {
+  "_comment": "Multi-harness plugin hooks (Claude Code + Factory Droid). Both auto-discover this root file and use the same Stop/UserPromptSubmit/PostToolUse event names; the command resolves from whichever plugin-root variable the running harness sets (Claude: CLAUDE_PLUGIN_ROOT, Factory: DROID_PLUGIN_ROOT), and ship.sh re-derives the real root from its own path regardless. Codex and Cursor are wired from their own manifest hooks paths (hooks/codex.json, hooks/cursor.json). Gemini is NOT wired here: Claude's loader rejects Gemini's AfterAgent/BeforeAgent/AfterTool event names in this shared file, and Gemini can only read hooks from this same path — see docs/gemini.md.",
   "hooks": {
     "Stop": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/ship.sh\""
+            "command": "\"${CLAUDE_PLUGIN_ROOT:-${DROID_PLUGIN_ROOT:-.}}/hooks/ship.sh\" claude"
           }
         ]
       }
@@ -15,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/busy.sh\""
+            "command": "\"${CLAUDE_PLUGIN_ROOT:-${DROID_PLUGIN_ROOT:-.}}/hooks/busy.sh\" claude"
           }
         ]
       }
@@ -25,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/busy.sh\""
+            "command": "\"${CLAUDE_PLUGIN_ROOT:-${DROID_PLUGIN_ROOT:-.}}/hooks/busy.sh\" claude"
           }
         ]
       }
