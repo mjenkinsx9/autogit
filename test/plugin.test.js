@@ -35,9 +35,9 @@ describe("plugin: manifests", () => {
 
   it("per-harness manifests keep name/version/description in sync with the canonical one", () => {
     const base = JSON.parse(read(".claude-plugin/plugin.json"));
-    // Codex, Factory Droid, and Cursor each read their own manifest path but
-    // point at the same skills/ — their metadata must not drift from Claude's.
-    for (const f of [".codex-plugin/plugin.json", ".factory-plugin/plugin.json", ".cursor-plugin/plugin.json"]) {
+    // Codex, Factory Droid, Cursor, and Gemini each read their own manifest
+    // path but expose the same skills/ — metadata must not drift from Claude's.
+    for (const f of [".codex-plugin/plugin.json", ".factory-plugin/plugin.json", ".cursor-plugin/plugin.json", "gemini-extension.json"]) {
       const m = JSON.parse(read(f));
       assert.equal(m.name, base.name, `${f}: name`);
       assert.equal(m.version, base.version, `${f}: version`);

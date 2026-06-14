@@ -1,63 +1,72 @@
-# autogit on Gemini CLI — status: not ported (documented gap)
+# autogit on Gemini CLI — status: real port (skill), auto-ship is the remaining gap
 
-Gemini CLI uses a different extension model from the skills/commands/hooks
-plugins that Claude Code, Codex, Copilot CLI, Cursor, and Factory Droid share,
-so autogit does **not** currently ship a Gemini extension. This file explains
-what a faithful port would require so nobody assumes the gap is an oversight.
+Gemini CLI extensions now support **Agent Skills**, auto-discovered from a
+`skills/<name>/SKILL.md` layout — exactly the layout autogit already uses for
+its portable core (`skills/autogit-ops/SKILL.md`). So autogit ships a real
+Gemini extension: a `gemini-extension.json` at the repo root, with the skill
+reused (not duplicated), same as every other harness.
 
-## Why the other manifests don't carry over
+## What ships
 
-A Gemini extension is declared by a `gemini-extension.json` at the extension
-root. Its first-class surface is **MCP servers** (`mcpServers`), plus
-context files (`contextFileName`), tool exclusions (`excludeTools`),
-user settings, themes, and TOML custom commands under `commands/`. There is
-**no skills primitive** equivalent to a `SKILL.md`, so autogit's portable core
-— `skills/autogit-ops/SKILL.md` — has nothing to point at.
+`gemini-extension.json` (repo root), kept metadata-synced with
+`.claude-plugin/plugin.json`:
 
-Required `gemini-extension.json` fields (to keep in sync with
-`.claude-plugin/plugin.json` if/when this is built):
+```json
+{
+  "name": "autogit",
+  "version": "0.6.0",
+  "description": "Auto stage → secrets-scan → commit → push after every agent turn, …"
+}
+```
 
-- `name` — lowercase, digits and dashes only (Gemini expects it to match the
-  extension directory name): `autogit`
-- `version` — `0.6.0`
-- `description` — the autogit one-liner
+- `name` / `version` are the only required fields; `description` is shown on
+  geminicli.com/extensions.
+- There is **no `skills` field** — Gemini auto-discovers `skills/` from the
+  extension root, so `skills/autogit-ops/SKILL.md` is exposed as the
+  `autogit-ops` skill with no extra wiring.
+- Gemini expects the extension `name` to match its directory name; when linked
+  from this repo (directory `autogit`) that holds.
 
-## What a real port would take
+### Install (local / development)
 
-autogit's value is a **lifecycle hook**: after every agent turn in an opted-in
-repo, run `stage → secrets-scan → commit → push`. Two routes exist on Gemini,
-and neither is a drop-in:
+```bash
+git clone https://github.com/mjenkinsx9/autogit
+gemini extensions link ./autogit     # loads from ~/.gemini/extensions
+```
 
-1. **Hooks (`hooks/hooks.json`).** Gemini extensions can ship a
-   `hooks/hooks.json`, but as of this writing the public extension reference
-   does not pin down the turn-end event name, the payload shape, or the
-   environment variables a hook command receives. autogit's existing
-   `hooks/hooks.json` is Claude-format (events `Stop` /
-   `UserPromptSubmit` / `PostToolUse`, command interpolation via
-   `${CLAUDE_PLUGIN_ROOT}`) and would not run under Gemini as-is. A port
-   needs Gemini's real event names and a wrapper that resolves the autogit
-   `index.js` path the way `hooks/ship.sh` does for Claude — work that can't be
-   verified without a Gemini CLI to test against.
+Then drive it from the agent the same way as elsewhere — invoke the
+`autogit-ops` skill to run `on` / `off` / `status` / `undo` / `ship` against the
+current repo (the skill resolves the bundled `index.js` from its own path).
 
-2. **MCP server.** autogit could expose `on` / `off` / `status` / `ship` /
-   `undo` as MCP tools so the model can drive them on request. That restores
-   the **manual** control surface (what `/autogit` gives you elsewhere) but
-   **not** the automatic after-every-turn shipping, which is the whole point —
-   MCP tools are model-invoked, not lifecycle-triggered.
+## The remaining gap: automatic after-every-turn shipping
 
-A genuine port is therefore route 1, gated on Gemini documenting (and this repo
-testing) a turn-completion hook. Until then, Gemini users can still use autogit
-the harness-agnostic way:
+The Gemini extension delivers the **skill control surface**, not the
+**automatic** stage→scan→commit→push after every turn. That automation is a
+lifecycle hook, and it is the one piece that does not yet carry over:
+
+- autogit's existing `hooks/hooks.json` is Claude-format (events `Stop` /
+  `UserPromptSubmit` / `PostToolUse`, command interpolation via
+  `${CLAUDE_PLUGIN_ROOT}`) and does not run under Gemini as-is.
+- Gemini extensions can ship a `hooks/hooks.json`, but the public reference does
+  not yet pin down the turn-completion event name, payload shape, or the
+  environment a hook command receives — and there is no Gemini CLI in this
+  repo's build/CI environment to verify a port against. Faking a hook config we
+  can't test would be dishonest, so it's left out.
+
+This mirrors the other non-Claude harnesses (Codex, Cursor, Factory): the
+plugin/extension adds the `/autogit` control surface, and automatic shipping is
+expected to come from `autogit setup` once Gemini is added to its wiring (see
+the Roadmap in the README) or from a Gemini-native turn-end hook once that
+event is documented and testable.
+
+Until then, the harness-agnostic path also works:
 
 ```bash
 git clone https://github.com/mjenkinsx9/autogit && cd autogit && npm link
-autogit setup     # wires the agents autogit already supports
-cd your-project && autogit on
+autogit setup && cd your-project && autogit on
 ```
-
-`autogit setup` does not yet wire Gemini (see the Roadmap in the README); doing
-so is the same hook work described above.
 
 ## References
 
 - Gemini CLI extensions reference: https://geminicli.com/docs/extensions/reference/
+- Gemini CLI skills: https://geminicli.com/docs/cli/skills
