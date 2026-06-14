@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "hooks": {
+    "stop": [
+      { "command": "\"${CURSOR_PLUGIN_ROOT:-.}/hooks/ship.sh\" cursor" }
+    ],
+    "beforeSubmitPrompt": [
+      { "command": "\"${CURSOR_PLUGIN_ROOT:-.}/hooks/busy.sh\" cursor" }
+    ],
+    "postToolUse": [
+      { "command": "\"${CURSOR_PLUGIN_ROOT:-.}/hooks/busy.sh\" cursor" }
+    ]
+  }
+}

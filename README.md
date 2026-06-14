@@ -9,7 +9,7 @@
 [![CI](https://github.com/mjenkinsx9/autogit/actions/workflows/ci.yml/badge.svg)](https://github.com/mjenkinsx9/autogit/actions/workflows/ci.yml)
 ![Node](https://img.shields.io/badge/node-%E2%89%A518-339933?logo=nodedotjs&logoColor=white)
 ![Dependencies](https://img.shields.io/badge/dependencies-zero-blue)
-![Tests](https://img.shields.io/badge/tests-73_passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-83_passing-brightgreen)
 ![Agents](https://img.shields.io/badge/agents-Claude_Code_%7C_Codex_%7C_Cursor_%7C_Pi-d97757)
 ![Platform](https://img.shields.io/badge/platform-macos%20%7C%20linux-lightgrey)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
@@ -73,6 +73,38 @@ Done. Every agent turn in this repo now ships. Repos without `autogit on` are ne
 > The upstream npm package (`@davidondrej/autogit`) is the original 0.4.x — this fork's hardened build is install-from-source until it's published.
 
 macOS and Linux. Windows is unsupported — the hook commands are POSIX shell.
+
+## 🧩 Install as a plugin across harnesses
+
+The Agent Skill at `skills/autogit-ops/SKILL.md` is autogit's portable core — it tells any agent how to find and drive the bundled `index.js`. To make the same repo installable as a native plugin in several agent harnesses, autogit ships one tiny manifest per harness, all pointing at the **same** `skills/` (and, where supported, `commands/` and `hooks/`) — no duplicated content. Metadata (`name`/`version`/`description`) is kept in sync across all of them and checked by `test/plugin.test.js`.
+
+Two surfaces matter per harness: the **control surface** (the `autogit-ops` skill, invokable by the agent everywhere; plus the `/autogit` slash command where the harness packages `commands/`) and **auto-ship** (lifecycle hooks that run stage→scan→commit→push after every turn).
+
+| Harness | Control surface | Native auto-ship hooks | Validated here? |
+| --- | --- | --- | --- |
+| **Claude Code** | skill + `/autogit` | ✅ `hooks/hooks.json` (`Stop`/`UserPromptSubmit`/`PostToolUse`) | ✅ `claude plugin validate .` + test suite |
+| **OpenAI Codex** | skill | ✅ `hooks/codex.json` (same events; `${PLUGIN_ROOT}`) | ⚠️ schema-conformant, no Codex CLI to run |
+| **Factory Droid** | skill + `/autogit` | ✅ shares `hooks/hooks.json` (`${DROID_PLUGIN_ROOT}`) | ⚠️ schema-conformant, no Droid CLI to run |
+| **Cursor** | skill + `/autogit` | ✅ `hooks/cursor.json` (`stop`/`beforeSubmitPrompt`/`postToolUse`) | ⚠️ schema-conformant, no Cursor CLI to run |
+| **GitHub Copilot CLI** | skill + `/autogit` | — (uses `autogit setup`) | ⚠️ via `.claude-plugin` fallback |
+| **Gemini CLI** | skill | ⚠️ template only (`hooks/gemini.json`, see below) | ⚠️ skill auto-discovered |
+| **OpenCode** | reference plugin | reference plugin | 📄 unvalidated, see docs |
+
+How each manifest reaches its hooks:
+
+- **Claude Code** auto-discovers `hooks/hooks.json`. **Factory Droid** also auto-discovers that same file — both use the `Stop`/`UserPromptSubmit`/`PostToolUse` event names, and the command resolves from whichever plugin-root variable the running harness sets (`${CLAUDE_PLUGIN_ROOT}` / `${DROID_PLUGIN_ROOT}`).
+- **Codex** and **Cursor** point their manifest `hooks` field at a dedicated file (`hooks/codex.json`, `hooks/cursor.json`) — Codex because it reuses Claude's event schema (and offers `${CLAUDE_PLUGIN_ROOT}` for compat), Cursor because its schema differs (lowercase events, flat entries, no plugin-root variable → relative paths).
+- The shared `ship.sh`/`busy.sh` take a harness argument so their double-wiring guard checks the right global config (`~/.claude` / `~/.codex` / `~/.cursor`), and they re-derive the real plugin root from their own path — so they work no matter which variable located them.
+
+Caveats (honest):
+
+- **Only Claude Code is runtime-validated.** No Codex/Droid/Cursor/Gemini/Copilot CLI exists in this repo's build environment, so their hook files are schema-conformant against each harness's current docs but **not executed end-to-end**. Treat non-Claude auto-ship as best-effort until tested on a live install.
+- **Codex needs a one-time hook trust.** Codex treats plugin-bundled hooks as non-managed and skips them until you review and trust the current definition with `/hooks` inside Codex (its trust is hash-based, so it re-prompts whenever the hook file changes). So after installing `.codex-plugin/plugin.json` and running `on`, run `/hooks` and trust autogit's hooks once — until then Codex shows no automatic commits. (Same approval the [`autogit setup`](#-supported-agents) path documents.)
+- **Gemini auto-ship can't be active alongside Claude's.** Gemini extensions only read hooks from the root `hooks/hooks.json`, but Gemini uses different event names (`AfterAgent`/`BeforeAgent`/`AfterTool`) and **Claude's loader rejects those keys in that shared file** (`claude plugin validate` fails on them). Since Claude and Gemini both hard-read the same root file with mutually incompatible schemas, their hooks can't coexist in one repo. So the Gemini hooks ship as a ready-to-use **template** at [`hooks/gemini.json`](hooks/gemini.json) (inert where it sits): a Gemini-**only** install copies it to `hooks/hooks.json` to enable auto-ship. Full steps and reasoning in [docs/gemini.md](docs/gemini.md).
+- **Control surface varies.** Every harness exposes the `autogit-ops` **skill** (the agent invokes it). The `/autogit` **slash command** also appears where the harness packages `commands/` (Claude, Cursor, Copilot, Factory). Codex exposes skills only, and Gemini's custom commands are TOML — on those two, drive autogit through the skill, not a `/autogit` command.
+- **Copilot CLI** reads `.claude-plugin/plugin.json` as one of its documented manifest locations (it checks `.plugin/plugin.json`, `plugin.json`, `.github/plugin/plugin.json`, then `.claude-plugin/plugin.json`), so no extra file is needed; auto-ship there comes from `autogit setup`.
+- **Codex marketplace listing:** a Codex catalog lists plugins from `.agents/plugins/marketplace.json` with `source.path` entries — that file lives in the **catalog** repo, not here.
+- **OpenCode** is a JS event module (no skills, no manifest); a faithful port needs runtime-tested work that couldn't be validated here. [docs/opencode.md](docs/opencode.md) has a copy-pasteable reference plugin.
 
 ## 🤖 Supported agents
 
@@ -155,7 +187,7 @@ PR mode and `quiet` compose freely.
 npm test    # node --test test/*.test.js
 ```
 
-Node 18+, zero dev dependencies — tests use the built-in `node:test` runner (73 tests). CI runs them on Node 18/20/22 across Linux and macOS.
+Node 18+, zero dev dependencies — tests use the built-in `node:test` runner (83 tests). CI runs them on Node 18/20/22 across Linux and macOS.
 
 ## 🔧 Internals
 
@@ -176,6 +208,8 @@ For contributors, human or AI. The implementation is a reference of product inte
 - `autogit setup` wires lifecycle hooks globally: Claude Code `Stop` (`~/.claude/settings.json`), Codex `Stop` (`~/.codex/hooks.json`, ≥0.124, one-time `/hooks` trust), Cursor `stop` (`~/.cursor/hooks.json`, lowercase events + `version: 1`), and a Pi extension (`~/.pi/agent/extensions/autogit.ts`, fires on `agent_end`). All JSON configs merge through one helper; Claude/Codex share the same `Stop` entry shape.
 - `autogit teardown` (added 2026-06-11) reverses `setup` for all four agents: filters autogit entries out of the JSON hook configs, and deletes the Pi extension only if its content is recognizably ours. Idempotent; per-repo configs are untouched.
 - Claude Code plugin wrapper (DECIDED 2026-06-12, same repo — a separate plugin repo would just hold a drifting copy of `index.js`): `.claude-plugin/plugin.json` + `hooks/hooks.json` (Stop → `hooks/ship.sh`, UserPromptSubmit/PostToolUse → `hooks/busy.sh`) + `commands/autogit.md` → `skills/autogit-ops/SKILL.md` (anchor-style dispatch — `${CLAUDE_PLUGIN_ROOT}` expands in hook commands but NOT in command markdown, so the skill resolves the plugin root from its own file path). The hook scripts are fail-soft (no `node` on PATH → silent exit 0) and stand down when `~/.claude/settings.json` already contains `autogit ship`/`autogit busy` entries from a global `setup` (double-wiring guard). Distributed via the mjenkins-toolbox marketplace; npm `files` whitelist keeps plugin dirs out of any npm publish; `plugin.json` version must match `package.json` (tested).
+- Multi-harness plugin manifests (DECIDED 2026-06-14): the same repo is installable as a native plugin in several harnesses by shipping one tiny metadata manifest each, all pointing at the **shared** `skills/` (and `commands/`/`hooks/` where supported) — no duplicated skill content. Added `.codex-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.factory-plugin/plugin.json`, and `gemini-extension.json`; Copilot CLI needs no file (reads `.claude-plugin/plugin.json` as a documented fallback). `test/plugin.test.js` asserts all four added manifests' `name`/`version`/`description` stay in sync with `.claude-plugin/plugin.json`. OpenCode (JS module, no manifest) is a documented gap in `docs/opencode.md`.
+- Multi-harness auto-ship hooks (DECIDED 2026-06-14): the plugin wires native after-every-turn hooks for **four** harnesses, not just Claude. Claude and Factory Droid both auto-discover the root `hooks/hooks.json` and share the `Stop`/`UserPromptSubmit`/`PostToolUse` event names; the command resolves from `${CLAUDE_PLUGIN_ROOT:-${DROID_PLUGIN_ROOT:-.}}`. Codex (`hooks/codex.json`) and Cursor (`hooks/cursor.json`) are referenced from their own manifest `hooks` fields — Codex reuses the Claude schema (it provides `${CLAUDE_PLUGIN_ROOT}` for compat plus `${PLUGIN_ROOT}`), Cursor uses its own schema (lowercase `stop`/`beforeSubmitPrompt`/`postToolUse`, flat `{command}`, no plugin-root variable → relative paths). `ship.sh`/`busy.sh` gained a harness arg (`claude`/`codex`/`cursor`, default `claude` for back-compat) so the double-wiring guard checks the matching global config (`~/.claude`/`~/.codex`/`~/.cursor`); they still re-derive the real plugin root from their own path. **Gemini auto-ship is structurally blocked:** Gemini's hook events (`AfterAgent`/`BeforeAgent`/`AfterTool`) can only live in the root `hooks/hooks.json`, but Claude's loader rejects those keys there (`claude plugin validate` fails), and Claude reads that root file unconditionally — so Claude and Gemini hooks can't share one repo. Gemini keeps the skill; its auto-ship is left to `autogit setup`. Only Claude is runtime-validated here (no other harness CLI in the env); the Codex/Droid/Cursor hook files are schema-conformant against current docs but unrun. Full reasoning in `docs/gemini.md`.
 - Codex legacy `notify` is NOT used (single-slot, often taken by other tools; an upstream deprecation was attempted and reverted in 0.129). Codex hook commands run in the session `cwd`, unsandboxed, via `$SHELL -lc` — so `git push` has network and the user's PATH.
 - Codex surfaces (verified 2026-06-10): the desktop app and IDE extension run the same CLI core and execute the same `~/.codex/hooks.json`; cloud tasks never fire local hooks, and `codex exec` hook dispatch is broken upstream (openai/codex#26452). Trust is hash-based — any change to the wired commands silently un-trusts them until the user re-runs `/hooks`; editing hooks.json mid-session disables hooks until Codex restarts (#21160). Esc-interrupted turns fire no `Stop`; that turn's changes ship with the next one (busy-marker TTL self-heals).
 - `ship` reads an optional JSON payload from stdin (all hook systems pipe one): Cursor's carries `workspace_roots` (its hooks run from `~/.cursor`, not the project — multi-root workspaces ship every opted-in root) and `status` (`ship` only proceeds on `completed`, so aborted/errored turns never push). Claude/Codex payloads lack these fields and fall through to cwd behavior.
