@@ -87,7 +87,7 @@ Two surfaces matter per harness: the **control surface** (the `autogit-ops` skil
 | **Factory Droid** | skill + `/autogit` | ✅ shares `hooks/hooks.json` (`${DROID_PLUGIN_ROOT}`) | ⚠️ schema-conformant, no Droid CLI to run |
 | **Cursor** | skill + `/autogit` | ✅ `hooks/cursor.json` (`stop`/`beforeSubmitPrompt`/`postToolUse`) | ⚠️ schema-conformant, no Cursor CLI to run |
 | **GitHub Copilot CLI** | skill + `/autogit` | — (uses `autogit setup`) | ⚠️ via `.claude-plugin` fallback |
-| **Gemini CLI** | skill | ❌ blocked (see below) | ⚠️ skill auto-discovered |
+| **Gemini CLI** | skill | ⚠️ template only (`hooks/gemini.json`, see below) | ⚠️ skill auto-discovered |
 | **OpenCode** | reference plugin | reference plugin | 📄 unvalidated, see docs |
 
 How each manifest reaches its hooks:
@@ -99,7 +99,7 @@ How each manifest reaches its hooks:
 Caveats (honest):
 
 - **Only Claude Code is runtime-validated.** No Codex/Droid/Cursor/Gemini/Copilot CLI exists in this repo's build environment, so their hook files are schema-conformant against each harness's current docs but **not executed end-to-end**. Treat non-Claude auto-ship as best-effort until tested on a live install.
-- **Gemini auto-ship is blocked, not omitted.** Gemini extensions only read hooks from the root `hooks/hooks.json`, but Gemini uses different event names (`AfterAgent`/`BeforeAgent`/`AfterTool`) and **Claude's loader rejects those keys in that shared file** (`claude plugin validate` fails on them). Since Claude and Gemini both hard-read the same root file with mutually incompatible schemas, their hooks can't coexist in one repo. Gemini still gets the skill; its auto-ship is left to `autogit setup` once Gemini is added there. Full reasoning in [docs/gemini.md](docs/gemini.md).
+- **Gemini auto-ship can't be active alongside Claude's.** Gemini extensions only read hooks from the root `hooks/hooks.json`, but Gemini uses different event names (`AfterAgent`/`BeforeAgent`/`AfterTool`) and **Claude's loader rejects those keys in that shared file** (`claude plugin validate` fails on them). Since Claude and Gemini both hard-read the same root file with mutually incompatible schemas, their hooks can't coexist in one repo. So the Gemini hooks ship as a ready-to-use **template** at [`hooks/gemini.json`](hooks/gemini.json) (inert where it sits): a Gemini-**only** install copies it to `hooks/hooks.json` to enable auto-ship. Full steps and reasoning in [docs/gemini.md](docs/gemini.md).
 - **Control surface varies.** Every harness exposes the `autogit-ops` **skill** (the agent invokes it). The `/autogit` **slash command** also appears where the harness packages `commands/` (Claude, Cursor, Copilot, Factory). Codex exposes skills only, and Gemini's custom commands are TOML — on those two, drive autogit through the skill, not a `/autogit` command.
 - **Copilot CLI** reads `.claude-plugin/plugin.json` as one of its documented manifest locations (it checks `.plugin/plugin.json`, `plugin.json`, `.github/plugin/plugin.json`, then `.claude-plugin/plugin.json`), so no extra file is needed; auto-ship there comes from `autogit setup`.
 - **Codex marketplace listing:** a Codex catalog lists plugins from `.agents/plugins/marketplace.json` with `source.path` entries — that file lives in the **catalog** repo, not here.

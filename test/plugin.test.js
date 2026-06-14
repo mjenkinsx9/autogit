@@ -69,6 +69,17 @@ describe("plugin: manifests", () => {
     }
   });
 
+  it("Gemini hooks ship as an inert template (not the root file Claude validates)", () => {
+    // hooks/gemini.json carries Gemini's events for a Gemini-only install to copy
+    // into hooks/hooks.json. It must NOT be the active root file, or Claude breaks.
+    const g = JSON.parse(read("hooks/gemini.json")).hooks;
+    assert.match(g.AfterAgent[0].hooks[0].command, /extensionPath.*\/hooks\/ship\.sh" gemini$/);
+    assert.ok(g.BeforeAgent && g.AfterTool, "Gemini busy events present");
+    // The active root file must stay free of Gemini's keys (Claude rejects them).
+    const root = JSON.parse(read("hooks/hooks.json")).hooks;
+    assert.equal(root.AfterAgent, undefined);
+  });
+
   it("Codex and Cursor hook files are wired from their manifests and pass the right harness guard arg", () => {
     // Codex: dedicated file (manifest hooks path replaces root discovery), Claude-style schema.
     assert.equal(JSON.parse(read(".codex-plugin/plugin.json")).hooks, "./hooks/codex.json");

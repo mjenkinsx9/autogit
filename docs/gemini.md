@@ -64,13 +64,30 @@ reasoning, because it is not obvious:
    names; neither can read from anywhere else. One repo can't satisfy both.
 
 Rather than break Claude Code (the primary, runtime-validated harness) or fake
-an untested Gemini hook, autogit ships Gemini's **skill** and leaves Gemini's
-auto-ship to `autogit setup` once Gemini is added to its wiring (see the Roadmap
-in the README). A standalone Gemini-only distribution (no Claude manifest in the
-root) *could* carry the `AfterAgent` hooks; that's a packaging split, not a code
-gap.
+an untested Gemini hook in the active root file, autogit ships Gemini's **skill**
+in-place and provides the Gemini auto-ship hooks as a **ready-to-use template**
+that a Gemini-only install copies into position.
 
-Until then, the harness-agnostic path also works:
+### Gemini-only install: enable auto-ship
+
+The template lives at [`hooks/gemini.json`](../hooks/gemini.json) (it is inert
+where it sits — Gemini only auto-discovers `hooks/hooks.json`, and Claude never
+validates a non-`hooks.json` file). For an autogit checkout used **only** with
+Gemini (no Claude Code plugin reading this root), activate it:
+
+```bash
+gemini extensions link ./autogit         # exposes the autogit-ops skill
+cp ./autogit/hooks/gemini.json ./autogit/hooks/hooks.json   # Gemini-only: enable auto-ship
+cd your-project && gemini ... # then drive `autogit on` via the autogit-ops skill
+```
+
+`hooks/gemini.json` uses Gemini's events (`AfterAgent` → ship, `BeforeAgent` /
+`AfterTool` → busy marker) and `${extensionPath}`; the shared `ship.sh`/`busy.sh`
+re-derive the real plugin root from their own path. Do **not** do this in a
+checkout that is also installed as the Claude Code plugin — that is exactly the
+collision described above (`claude plugin validate` would then fail).
+
+The harness-agnostic path also works without touching hook files:
 
 ```bash
 git clone https://github.com/mjenkinsx9/autogit && cd autogit && npm link
