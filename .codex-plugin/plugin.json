@@ -1,7 +1,27 @@
 {
   "name": "autogit",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Auto stage → secrets-scan → commit → push after every agent turn, strictly per-repo opt-in (/autogit on). One-command undo, quiet batching, PR mode.",
+  "author": { "name": "Mike Jenkins" },
+  "homepage": "https://github.com/mjenkinsx9/autogit",
+  "repository": "https://github.com/mjenkinsx9/autogit",
+  "license": "MIT",
+  "keywords": ["git", "automation", "auto-commit", "auto-push", "hooks"],
   "skills": "./skills/",
-  "hooks": "./hooks/codex.json"
+  "hooks": "./hooks/codex.json",
+  "interface": {
+    "displayName": "autogit",
+    "shortDescription": "Auto-commit and push opted-in agent work.",
+    "longDescription": "autogit stages, scans, commits, and pushes changes after agent turns in repositories where you explicitly opt in, with one-command undo, quiet batching, and PR mode.",
+    "developerName": "Mike Jenkins",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "defaultPrompt": [
+      "Enable autogit in this repo.",
+      "Check autogit status.",
+      "Undo the last autogit ship."
+    ],
+    "websiteURL": "https://github.com/mjenkinsx9/autogit",
+    "brandColor": "#DC2626"
+  }
 }
