@@ -28,7 +28,7 @@ autogit wires itself into your agents' lifecycle hooks once, per machine. After 
 |---|---|---|
 | 🚢 | **Auto-ship** | Every agent turn ends with stage → scan → commit → push — zero ceremony |
 | ✉️ | **Prompts as commit messages** | The subject is what you asked your agent to do; "yes"-type replies and slash commands never make it in |
-| 🔐 | **Secrets gate** | Pattern scan over the staged diff (Anthropic, OpenAI, AWS, GitHub, GitLab, Stripe, npm, Slack, Google, key files, JWTs…) blocks the push and unstages — fail-closed |
+| 🔐 | **Secrets gate** | Pattern scan over the staged diff blocks the push and unstages — fail-closed |
 | ↩️ | **One-command undo** | `autogit undo` rewinds the remote *and* the local commit, leaving your changes back in the working tree |
 | ⏱️ | **Quiet batching** | `"quiet": "5m"` accumulates turns and ships one commit after the repo goes quiet |
 | 🔀 | **PR mode** | `"pr": true` pushes to `autogit/<branch>` and auto-opens a pull request via `gh` |
@@ -57,210 +57,29 @@ The plugin wires the hooks automatically — no `autogit setup`, no edits to `~/
 ```bash
 git clone https://github.com/mjenkinsx9/autogit && cd autogit && npm link
 autogit setup
+cd your-project && autogit on
 ```
 
-`setup` wires the lifecycle hooks for every agent it finds — Claude Code, Codex, Cursor, and Pi. Run `autogit teardown` any time to unwire them all. Then enable per repo:
+`setup` wires the lifecycle hooks for every agent it finds — Claude Code, Codex, Cursor, and Pi. Every agent turn in an opted-in repo now ships. Repos without `autogit on` are never touched.
 
-```bash
-cd your-project
-autogit on
-```
+macOS and Linux. Windows is unsupported — the hook commands are POSIX shell. Full install paths, the double-wiring guard, and per-agent notes are in [docs/02-installation.md](docs/02-installation.md).
 
-Done. Every agent turn in this repo now ships. Repos without `autogit on` are never touched.
+## 📚 Documentation
 
-> Don't double up: if you install the Claude Code plugin AND run `autogit setup`, the plugin detects the global wiring and stands down, so turns never ship twice.
->
-> This fork is **not published to npm** — it installs from source (the `npm link` above) or via the marketplace plugin. The upstream npm package (`@davidondrej/autogit`) is David Ondrej's separate original 0.4.x.
+Full guides, configuration, and internals live in [`docs/`](docs/README.md).
 
-macOS and Linux. Windows is unsupported — the hook commands are POSIX shell.
-
-## 🧩 Install as a plugin across harnesses
-
-The Agent Skill at `skills/autogit-ops/SKILL.md` is autogit's portable core — it tells any agent how to find and drive the bundled `index.js`. To make the same repo installable as a native plugin in several agent harnesses, autogit ships one tiny manifest per harness, all pointing at the **same** `skills/` (and, where supported, `commands/` and `hooks/`) — no duplicated content. Metadata (`name`/`version`/`description`) is kept in sync across all of them and checked by `test/plugin.test.js`.
-
-Two surfaces matter per harness: the **control surface** (the `autogit-ops` skill, invokable by the agent everywhere; plus the `/autogit` slash command where the harness packages `commands/`) and **auto-ship** (lifecycle hooks that run stage→scan→commit→push after every turn).
-
-| Harness | Control surface | Native auto-ship hooks | Validated here? |
-| --- | --- | --- | --- |
-| **Claude Code** | skill + `/autogit` | ✅ `hooks/hooks.json` (`Stop`/`UserPromptSubmit`/`PostToolUse`) | ✅ `claude plugin validate .` + test suite |
-| **OpenAI Codex** | skill | ✅ `hooks/codex.json` (same events; `${PLUGIN_ROOT}`) | ⚠️ schema-conformant, no Codex CLI to run |
-| **Factory Droid** | skill + `/autogit` | ✅ shares `hooks/hooks.json` (`${DROID_PLUGIN_ROOT}`) | ⚠️ schema-conformant, no Droid CLI to run |
-| **Cursor** | skill + `/autogit` | ✅ `hooks/cursor.json` (`stop`/`beforeSubmitPrompt`/`postToolUse`) | ⚠️ schema-conformant, no Cursor CLI to run |
-| **GitHub Copilot CLI** | skill + `/autogit` | — (uses `autogit setup`) | ⚠️ via `.claude-plugin` fallback |
-| **Gemini CLI** | skill | ⚠️ template only (`hooks/gemini.json`, see below) | ⚠️ skill auto-discovered |
-| **OpenCode** | reference plugin | reference plugin | 📄 unvalidated, see docs |
-
-How each manifest reaches its hooks:
-
-- **Claude Code** auto-discovers `hooks/hooks.json`. **Factory Droid** also auto-discovers that same file — both use the `Stop`/`UserPromptSubmit`/`PostToolUse` event names, and the command resolves from whichever plugin-root variable the running harness sets (`${CLAUDE_PLUGIN_ROOT}` / `${DROID_PLUGIN_ROOT}`).
-- **Codex** and **Cursor** point their manifest `hooks` field at a dedicated file (`hooks/codex.json`, `hooks/cursor.json`) — Codex because it reuses Claude's event schema (and offers `${CLAUDE_PLUGIN_ROOT}` for compat), Cursor because its schema differs (lowercase events, flat entries, no plugin-root variable → relative paths).
-- The shared `ship.sh`/`busy.sh` take a harness argument so their double-wiring guard checks the right global config (`~/.claude` / `~/.codex` / `~/.cursor`), and they re-derive the real plugin root from their own path — so they work no matter which variable located them.
-
-Caveats (honest):
-
-- **Only Claude Code is runtime-validated.** No Codex/Droid/Cursor/Gemini/Copilot CLI exists in this repo's build environment, so their hook files are schema-conformant against each harness's current docs but **not executed end-to-end**. Treat non-Claude auto-ship as best-effort until tested on a live install.
-- **Codex needs a one-time hook trust.** Codex treats plugin-bundled hooks as non-managed and skips them until you review and trust the current definition with `/hooks` inside Codex (its trust is hash-based, so it re-prompts whenever the hook file changes). So after installing `.codex-plugin/plugin.json` and running `on`, run `/hooks` and trust autogit's hooks once — until then Codex shows no automatic commits. (Same approval the [`autogit setup`](#-supported-agents) path documents.)
-- **Gemini auto-ship can't be active alongside Claude's.** Gemini extensions only read hooks from the root `hooks/hooks.json`, but Gemini uses different event names (`AfterAgent`/`BeforeAgent`/`AfterTool`) and **Claude's loader rejects those keys in that shared file** (`claude plugin validate` fails on them). Since Claude and Gemini both hard-read the same root file with mutually incompatible schemas, their hooks can't coexist in one repo. So the Gemini hooks ship as a ready-to-use **template** at [`hooks/gemini.json`](hooks/gemini.json) (inert where it sits): a Gemini-**only** install copies it to `hooks/hooks.json` to enable auto-ship. Full steps and reasoning in [docs/gemini.md](docs/gemini.md).
-- **Control surface varies.** Every harness exposes the `autogit-ops` **skill** (the agent invokes it). The `/autogit` **slash command** also appears where the harness packages `commands/` (Claude, Cursor, Copilot, Factory). Codex exposes skills only, and Gemini's custom commands are TOML — on those two, drive autogit through the skill, not a `/autogit` command.
-- **Copilot CLI** reads `.claude-plugin/plugin.json` as one of its documented manifest locations (it checks `.plugin/plugin.json`, `plugin.json`, `.github/plugin/plugin.json`, then `.claude-plugin/plugin.json`), so no extra file is needed; auto-ship there comes from `autogit setup`.
-- **Codex marketplace listing:** a Codex catalog lists plugins from `.agents/plugins/marketplace.json` with `source.path` entries — that file lives in the **catalog** repo, not here.
-- **OpenCode** is a JS event module (no skills, no manifest); a faithful port needs runtime-tested work that couldn't be validated here. [docs/opencode.md](docs/opencode.md) has a copy-pasteable reference plugin.
-
-## 🤖 Supported agents
-
-| Agent | After `autogit setup` |
+| Doc | Description |
 | --- | --- |
-| **Claude Code** | works immediately — or skip `setup` entirely and use the plugin (see Quick start) |
-| **Cursor** | works immediately — local + worktree agents (cloud agents don't fire stop hooks yet) |
-| **Pi** | works immediately |
-| **Codex** | one-time approval: restart open sessions, then run `/hooks` in `codex` and trust autogit (needs ≥ 0.124) — covers the CLI, the Codex desktop app, and the IDE extension |
+| [Overview](docs/01-overview.md) | What autogit is, the feature set, and platform support |
+| [Installation & Quick Start](docs/02-installation.md) | Install as a plugin or the CLI, opt in per repo, supported agents |
+| [Commands](docs/03-commands.md) | Every command, `ship` flags, commit-message rules, and undo |
+| [Batching & PR Mode](docs/04-batching-and-pr-mode.md) | Quiet batching (`quiet`) and PR mode (`pr`) |
+| [Configuration](docs/05-configuration.md) | `autogit.json` keys and defaults |
+| [Safety](docs/06-safety.md) | Opt-in model, secrets scan, undo, merge/rebase guard |
+| [Install Across Harnesses](docs/07-harness-install.md) | Per-harness plugin manifests and auto-ship hooks |
+| [Internals](docs/08-internals.md) | Design, how `ship`/`undo`/batching work, busy markers, fail-safes |
 
-> Hooks fire for local agent sessions. Delegated/cloud runs (Cursor cloud agents, Codex cloud tasks) and `codex exec` don't fire them yet — upstream limitations. Codex re-asks for `/hooks` trust whenever autogit updates its hook entries.
-
-## 📟 Commands
-
-```
-autogit setup     Wire up agent hooks (once per machine)
-autogit teardown  Remove all global agent hooks (per-repo configs untouched)
-autogit on        Enable auto-push in this repo
-autogit off       Disable auto-push in this repo
-autogit ship      Stage, scan, commit, push (what the hooks run)
-autogit undo      Take back the last autogit commit, local + remote
-autogit status    Show hooks + repo state (including pending batches)
-autogit --version Print the installed version (-v)
-```
-
-**`ship` flags**: `-m "message"` sets the commit subject. `--force-secrets` pushes past a diff-scan block. `--dry-run` runs the whole pipeline — stages, scans, computes the subject and push target — then reports what would happen and unstages everything. Note: dry-run (like `ship` itself) runs `git add -A` + `git reset`, so it clears any manual staging selection. `--flush` ships a pending batch immediately (see Batching below).
-
-**Commit messages**: `autogit ship -m "message"` uses your message. Without `-m`, the subject is the prompt you gave your agent that turn (so `git log` reads like your instructions), falling back to a list of changed files. Two filters apply: a prompt that looks like it contains a secret (pasted API key, token, etc.) is never used — not overridable — and a prompt that wouldn't make a useful subject (short "yes"/"ok"-type replies, slash commands) is skipped for the next candidate, ultimately the file list.
-
-**Undo**: shipped something you regret? `autogit undo` rewinds the remote branch, removes the commit locally, and leaves the changes uncommitted in your working tree — ready to fix and re-ship. Run it again to peel off earlier autogit commits. It refuses to touch commits it didn't make, or remotes that have since moved on.
-
-## ⏱️ Batching
-
-By default every turn ships. Set `quiet` in the config to batch instead:
-
-```json
-{ "mode": "auto", "quiet": "5m" }
-```
-
-Turns accumulate, and autogit ships once the repo has been quiet — no agent turn ended — for that long. One commit: the subject is the last prompt, the body lists all of them. Values are seconds, or strings like `"90s"` / `"5m"`.
-
-`autogit ship --flush` ships any pending batch (plus uncommitted changes) right now, skipping the wait. `autogit status` shows pending batches.
-
-No daemon: each turn spawns a short-lived detached timer, and if a timer ever dies the next ship notices the aged batch and flushes it as a backstop.
-
-## 🔀 PR mode
-
-Set `pr: true` and autogit pushes to `autogit/<branch>` instead of `<branch>`. If `gh` is installed, it auto-opens a pull request (and leaves an already-open one alone on later ships); without `gh` the push still lands, with a note. `autogit undo` rewinds the PR branch. Your local branch still carries the commits — the PR branch is just where they're pushed. (Undo reads the config to know which branch to rewind, so undo a PR-mode ship *before* running `autogit off`.)
-
-PR mode and `quiet` compose freely.
-
-## ⚙️ Configuration
-
-`autogit on` writes `autogit.json` into the git common dir — `.git/autogit.json` in a normal clone, shared by all linked worktrees. All keys, with defaults:
-
-```json
-{
-  "mode": "auto",
-  "remote": "origin",
-  "branch": "current",
-  "secretsScan": true,
-  "quiet": 0,
-  "pr": false
-}
-```
-
-## 🛡️ Safety
-
-- **Opt-in per repo** — repos without `autogit on` are never touched. Config lives in the git dir (`.git/autogit.json`), never committed — enabling autogit can't silently opt in your teammates. (A legacy root `.autogit.json` is still honored; `autogit on` migrates it.)
-- **No silent losses** — a failed push leaves a marker and is retried on later turns (`status` shows it); a failed or blinded secrets scan blocks instead of passing; a failed `git add` is a visible error, not "nothing changed".
-- **One-command undo** — `autogit undo` takes back the last auto-push, remote included.
-- **Merge/rebase guard** — mid-merge, mid-rebase, mid-cherry-pick, or mid-bisect repos are never shipped.
-- **Secrets scan** — blocks pushes containing Anthropic, OpenAI, AWS, GitHub (classic + fine-grained), GitLab, Stripe, npm, SendGrid, Twilio, Slack, or Google keys, private key blocks, JWTs, and sensitive files (`.npmrc`, `.pypirc`, `.env*`, key files) — and unstages everything. Override with `--force-secrets`. Commit messages are covered too: a prompt containing a secret never becomes the subject (not overridable). It's a pattern-based screen, not a guarantee — for high-stakes repos, run a dedicated scanner as well.
-- **No noise** — nothing changed means nothing shipped. Aborted or errored Cursor turns never ship.
-- **Parallel-agent aware** — if another agent is still mid-task in the same repo, autogit waits its turn: the last agent to finish ships everything. (For fully separate commits per agent, use worktrees — autogit handles each independently.)
-
-## 🧪 Development
-
-```bash
-npm test    # node --test test/*.test.js
-```
-
-Node 18+, zero dev dependencies — tests use the built-in `node:test` runner (83 tests). CI runs them on Node 18/20/22 across Linux and macOS.
-
-## 🔧 Internals
-
-For contributors, human or AI. The implementation is a reference of product intent, not fixed architecture.
-
-### Design
-
-- Single zero-dependency Node.js CLI: `index.js`, ESM, Node ≥18.
-- Commands: `setup`, `teardown`, `on`, `off`, `ship`, `undo`, `busy`, `status`, plus `-v`/`--version` (read from `package.json`, also shown by `status`).
-- One mode for now (DECIDED 2026-06-10): **auto** — ship immediately, no review gate. Review modes are on the roadmap.
-- npm: **not published** (DECIDED 2026-06-17). `package.json` is `private: true` under the fork's own name `@mjenkinsx9/autogit`; distribution is the marketplace plugin + install-from-source (`npm link`), so a registry presence buys nothing. The installed binary stays `autogit`. (The upstream `@davidondrej/autogit` is David Ondrej's separate package.)
-- Per-repo opt-in is the safety model: `autogit on` writes the config; without it, `ship` is a silent no-op (exit 0). Only enable it where aggressive auto-push is OK.
-- Config lives at `<git-common-dir>/autogit.json` (DECIDED 2026-06-11): the old root `.autogit.json` was contagious — `git add -A` committed it, so one user running `autogit on` silently enabled auto-push for every collaborator who'd run `setup`. The git dir can't be committed. Common dir = one config per clone, shared by all worktrees. Legacy root files are still read (with a stderr nudge on ship); `autogit on` deletes and migrates them — and warns if the legacy file was tracked, since its deletion ships with the next turn. `autogit off` deletes both locations.
-- Exit-code contract (DECIDED 2026-06-11, now explicit): 0 = shipped or clean no-op; 1 = real failure (bad config JSON, secrets block, commit/push failure, detached HEAD, undo failures); NEVER 2. All human output on stderr, except `status`/`setup`/`teardown`/help/version reports on stdout.
-- Multi-root ships (DECIDED 2026-06-11): a failure in one workspace root doesn't abort the others — every root runs, each error is printed, exit 1 at the end if any failed.
-- Merge/rebase guard (DECIDED 2026-06-11): before staging, `ship` no-ops (exit 0) if the per-worktree git dir contains `MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `BISECT_LOG`, `rebase-apply`, or `rebase-merge`.
-- One helper, `remoteBranchFor(config, localBranch)`, decides the push target for both `ship` and `undo`: `autogit/<branch>` in PR mode, otherwise the configured or current branch.
-- `autogit setup` wires lifecycle hooks globally: Claude Code `Stop` (`~/.claude/settings.json`), Codex `Stop` (`~/.codex/hooks.json`, ≥0.124, one-time `/hooks` trust), Cursor `stop` (`~/.cursor/hooks.json`, lowercase events + `version: 1`), and a Pi extension (`~/.pi/agent/extensions/autogit.ts`, fires on `agent_end`). All JSON configs merge through one helper; Claude/Codex share the same `Stop` entry shape.
-- `autogit teardown` (added 2026-06-11) reverses `setup` for all four agents: filters autogit entries out of the JSON hook configs, and deletes the Pi extension only if its content is recognizably ours. Idempotent; per-repo configs are untouched.
-- Claude Code plugin wrapper (DECIDED 2026-06-12, same repo — a separate plugin repo would just hold a drifting copy of `index.js`): `.claude-plugin/plugin.json` + `hooks/hooks.json` (Stop → `hooks/ship.sh`, UserPromptSubmit/PostToolUse → `hooks/busy.sh`) + `commands/autogit.md` → `skills/autogit-ops/SKILL.md` (anchor-style dispatch — `${CLAUDE_PLUGIN_ROOT}` expands in hook commands but NOT in command markdown, so the skill resolves the plugin root from its own file path). The hook scripts are fail-soft (no `node` on PATH → silent exit 0) and stand down when `~/.claude/settings.json` already contains `autogit ship`/`autogit busy` entries from a global `setup` (double-wiring guard). Distributed via the mjenkins-toolbox marketplace; npm `files` whitelist keeps plugin dirs out of any npm publish; `plugin.json` version must match `package.json` (tested).
-- Multi-harness plugin manifests (DECIDED 2026-06-14): the same repo is installable as a native plugin in several harnesses by shipping one tiny metadata manifest each, all pointing at the **shared** `skills/` (and `commands/`/`hooks/` where supported) — no duplicated skill content. Added `.codex-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.factory-plugin/plugin.json`, and `gemini-extension.json`; Copilot CLI needs no file (reads `.claude-plugin/plugin.json` as a documented fallback). `test/plugin.test.js` asserts all four added manifests' `name`/`version`/`description` stay in sync with `.claude-plugin/plugin.json`. OpenCode (JS module, no manifest) is a documented gap in `docs/opencode.md`.
-- Multi-harness auto-ship hooks (DECIDED 2026-06-14): the plugin wires native after-every-turn hooks for **four** harnesses, not just Claude. Claude and Factory Droid both auto-discover the root `hooks/hooks.json` and share the `Stop`/`UserPromptSubmit`/`PostToolUse` event names; the command resolves from `${CLAUDE_PLUGIN_ROOT:-${DROID_PLUGIN_ROOT:-.}}`. Codex (`hooks/codex.json`) and Cursor (`hooks/cursor.json`) are referenced from their own manifest `hooks` fields — Codex reuses the Claude schema (it provides `${CLAUDE_PLUGIN_ROOT}` for compat plus `${PLUGIN_ROOT}`), Cursor uses its own schema (lowercase `stop`/`beforeSubmitPrompt`/`postToolUse`, flat `{command}`, no plugin-root variable → relative paths). `ship.sh`/`busy.sh` gained a harness arg (`claude`/`codex`/`cursor`, default `claude` for back-compat) so the double-wiring guard checks the matching global config (`~/.claude`/`~/.codex`/`~/.cursor`); they still re-derive the real plugin root from their own path. **Gemini auto-ship is structurally blocked:** Gemini's hook events (`AfterAgent`/`BeforeAgent`/`AfterTool`) can only live in the root `hooks/hooks.json`, but Claude's loader rejects those keys there (`claude plugin validate` fails), and Claude reads that root file unconditionally — so Claude and Gemini hooks can't share one repo. Gemini keeps the skill; its auto-ship is left to `autogit setup`. Only Claude is runtime-validated here (no other harness CLI in the env); the Codex/Droid/Cursor hook files are schema-conformant against current docs but unrun. Full reasoning in `docs/gemini.md`.
-- Codex legacy `notify` is NOT used (single-slot, often taken by other tools; an upstream deprecation was attempted and reverted in 0.129). Codex hook commands run in the session `cwd`, unsandboxed, via `$SHELL -lc` — so `git push` has network and the user's PATH.
-- Codex surfaces (verified 2026-06-10): the desktop app and IDE extension run the same CLI core and execute the same `~/.codex/hooks.json`; cloud tasks never fire local hooks, and `codex exec` hook dispatch is broken upstream (openai/codex#26452). Trust is hash-based — any change to the wired commands silently un-trusts them until the user re-runs `/hooks`; editing hooks.json mid-session disables hooks until Codex restarts (#21160). Esc-interrupted turns fire no `Stop`; that turn's changes ship with the next one (busy-marker TTL self-heals).
-- `ship` reads an optional JSON payload from stdin (all hook systems pipe one): Cursor's carries `workspace_roots` (its hooks run from `~/.cursor`, not the project — multi-root workspaces ship every opted-in root) and `status` (`ship` only proceeds on `completed`, so aborted/errored turns never push). Claude/Codex payloads lack these fields and fall through to cwd behavior.
-
-### How `ship` works
-
-Merge/rebase guard → `git add -A` → secrets scan on added lines (the full key list in Safety above; `--force-secrets` overrides) → commit → push to the target from `remoteBranchFor` (current branch by default, `autogit/<branch>` in PR mode).
-
-Commit subject precedence: `-m` flag > the turn's user prompt > the agent's final message (Codex `last_assistant_message`) > file-list fallback (`autogit: update X, Y (+N more)`). Every prompt-derived candidate passes `promptWorthy` first (added 2026-06-11): under 12 chars, slash commands, and "yes"/"ok"/"lgtm"-type acknowledgements never become subjects — the chain falls through to the next candidate. Candidates are also checked against `SECRET_PATTERNS` (full text, pre-truncation — the diff scan never sees the message): a match drops to the file-list fallback, with a stderr note. `--force-secrets` deliberately does not override this. The prompt comes from the session's busy-marker content (see below), or a `prompt`-like field in the stop payload, or the last real user message in the `transcript_path` JSONL — both Claude transcript and Codex rollout line shapes are parsed (formats are officially unstable, so parsing is defensive; tool results and `<`-prefixed noise like `<user_instructions>` are skipped). Subjects are flattened to one line, capped at 72 chars. Every commit gets a `Shipped-by: autogit` trailer — that's how `undo` identifies autogit commits.
-
-### Batching (`quiet`)
-
-- Pending state lives at `<git-dir>/autogit-pending.json` (per-worktree, same resolution as busy markers): first-pending timestamp + the accumulated worthy prompts (secret-bearing prompts are never stored). File mtime = last activity.
-- Each turn appends to the pending file and spawns a detached `ship --timer <ms>` child (`stdio: "ignore"`, unref'd). The timer wakes after the quiet window plus grace, exits silently if newer activity refreshed the file (a newer timer exists) or another agent is busy, otherwise ships the batch.
-- Backstop: if a batch has already aged past the quiet window when the next turn's ship runs (all timers died — reboot, kill), that ship flushes it immediately, including the new turn.
-- Batch commit: subject = last worthy prompt (or `-m`, or file list); >1 prompt adds a body bulleting all prompts (flattened, 72-char cap each) above the `Shipped-by: autogit` trailer. The pending file is deleted right after a successful commit, before the push.
-- `--flush` is the user-facing immediate ship; `--dry-run` reports what a flush would do without touching the pending file.
-
-### How `undo` works
-
-Escape hatch for bad auto-pushes; one commit per run, repeatable. Refuses unless the last commit has the `Shipped-by: autogit` trailer (or legacy `autogit:` subject prefix). Order matters: it rewinds the remote first (`push --force-with-lease` of the parent, only if the remote tip still equals the shipped commit), then `git reset <parent>` (mixed) locally so the changes land back in the working tree uncommitted. Remote tip == parent means the push never landed → local-only undo. Remote moved past the commit → die, undo manually. Works even after `autogit off` (falls back to default remote `origin`). In PR mode the same logic targets `autogit/<branch>` via `remoteBranchFor`.
-
-### Parallel agents (busy markers)
-
-- Problem: `git add -A` would scoop up a second agent's half-finished work when the first agent's turn ends.
-- Solution: while an agent is mid-turn it holds a marker file in `<git-dir>/autogit-busy/<session-id>`. `ship` clears its own marker, then defers (exit 0, stderr note) if any other fresh marker exists. The last agent to finish ships everything. No polling, no daemon.
-- Markers are written/refreshed by `autogit busy`, wired to: Claude `UserPromptSubmit` + `PostToolUse`, Codex `UserPromptSubmit` + `PostToolUse`, Cursor `beforeSubmitPrompt` + `postToolUse`, Pi `agent_start` + `tool_execution_end`. Tool hooks refresh the marker so long turns stay fresh.
-- Marker content doubles as prompt storage: prompt-submit hooks carry the user's prompt, so `busy` writes it into the marker; tool hooks carry none, so they only bump mtime (preserving the content). `ship` reads its own marker before clearing it and uses the prompt as the commit subject. Pi's hooks don't expose the prompt — Pi ships with the file-list fallback.
-- Stale markers (> 15 min, `BUSY_TTL_MS`) mean a crashed agent — they're deleted on sight, so shipping self-heals.
-- Markers live under the *resolved* git dir (`git rev-parse --git-dir`), so each worktree has its own set — parallel worktree agents never block each other.
-- `autogit busy` must stay silent on stdout (some hooks parse stdout). Session ids come from hook payloads (`session_id`/`conversation_id`/`thread_id`/`turn_id`) or `--id` (Pi). No id → no marker (an unattributable marker can never be cleared by its owner and would block shipping until stale).
-- Limit: simultaneous agents in ONE directory still end up in one blended commit (shipped by the last finisher). True isolation = worktrees.
-
-### Fail-safes
-
-- Hooks must never disturb the agent: `ship` exits 0 on every no-op path, and never exits 2 (Claude would block its Stop hook; Codex would treat stderr as instructions and *continue the turn*). All output goes to stderr — Codex parses Stop-hook stdout as JSON and injects UserPromptSubmit stdout into model context.
-- Mid-merge/rebase/cherry-pick/bisect repos are a clean no-op — hooks come back untouched.
-- Secrets scan blocks the push and fully unstages (`git reset`).
-- `autogit undo` reverses a bad ship — remote rewind + local uncommit, never touches non-autogit commits.
-- Failed-push recovery (DECIDED 2026-06-11): the quiet timer runs detached with discarded stderr, so a push failure there would otherwise be invisible and never retried. A failed push writes `<git-dir>/autogit-push-failed.json` (remote, target, SHA); every later ship retries it (pushing the recorded SHA, not HEAD — the user may have switched branches), a successful push to the same destination settles it, and `status` reports it. Secrets scanning is likewise fail-closed: the diff runs with `--no-ext-diff` (external diff tools emit no `+` lines and would blind the scan) and a scan whose git commands fail blocks the ship instead of passing it.
-- Nothing staged → no commit, no push, no noise.
-- Multi-root ships keep going past a failed root; the exit code reports the failure at the end.
-
-## 🗺️ Roadmap
-
-Owner-gated — don't build these without a go-ahead.
-
-- **agent mode** — an LLM reviews the diff before push, for more serious repos. Owner decision 2026-06-09 (upstream): the *currently-running* agent should review (it has task context), not a separate OpenRouter call. Mechanics TBD.
-- **human mode** — terminal y/n prompt on the diff, for production repos. (Existed in the pre-MVP prototype, cut for focus.)
-- More agents in `setup` (Pi added 2026-06-10; Hermes next: `post_llm_call` shell hook in `~/.hermes/config.yaml` + reading `cwd` from stdin JSON in `ship` + user consent flow).
-- Richer PR flows — basic PR mode shipped in 0.5.0 (push to `autogit/<branch>` + auto-open via `gh`); deeper PR integration considered.
+Full documentation map: [docs/README.md](docs/README.md)
 
 ## 📄 License
 
