@@ -1,11 +1,12 @@
 {
-  "name": "@davidondrej/autogit",
+  "name": "@mjenkinsx9/autogit",
+  "private": true,
   "version": "0.6.1",
   "description": "Auto stage→commit→push for agentic engineers. Works with any coding agent.",
   "scripts": {
     "test": "node --test test/*.test.js"
   },
-  "author": "David Ondrej",
+  "author": "Mike Jenkins",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mjenkinsx9/autogit.git"
