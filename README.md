@@ -70,7 +70,7 @@ Done. Every agent turn in this repo now ships. Repos without `autogit on` are ne
 
 > Don't double up: if you install the Claude Code plugin AND run `autogit setup`, the plugin detects the global wiring and stands down, so turns never ship twice.
 >
-> The upstream npm package (`@davidondrej/autogit`) is the original 0.4.x — this fork's hardened build is install-from-source until it's published.
+> This fork is **not published to npm** — it installs from source (the `npm link` above) or via the marketplace plugin. The upstream npm package (`@davidondrej/autogit`) is David Ondrej's separate original 0.4.x.
 
 macOS and Linux. Windows is unsupported — the hook commands are POSIX shell.
 
@@ -198,7 +198,7 @@ For contributors, human or AI. The implementation is a reference of product inte
 - Single zero-dependency Node.js CLI: `index.js`, ESM, Node ≥18.
 - Commands: `setup`, `teardown`, `on`, `off`, `ship`, `undo`, `busy`, `status`, plus `-v`/`--version` (read from `package.json`, also shown by `status`).
 - One mode for now (DECIDED 2026-06-10): **auto** — ship immediately, no review gate. Review modes are on the roadmap.
-- npm name (DECIDED 2026-06-10, upstream): **`@davidondrej/autogit`** — unscoped `autogit`/`autogit-cli` taken; `auto-git` rejected by npm's name-similarity rule. The installed binary stays `autogit`. Scoped packages need `npm publish --access=public`. This fork is unpublished; a rename is needed before publishing.
+- npm: **not published** (DECIDED 2026-06-17). `package.json` is `private: true` under the fork's own name `@mjenkinsx9/autogit`; distribution is the marketplace plugin + install-from-source (`npm link`), so a registry presence buys nothing. The installed binary stays `autogit`. (The upstream `@davidondrej/autogit` is David Ondrej's separate package.)
 - Per-repo opt-in is the safety model: `autogit on` writes the config; without it, `ship` is a silent no-op (exit 0). Only enable it where aggressive auto-push is OK.
 - Config lives at `<git-common-dir>/autogit.json` (DECIDED 2026-06-11): the old root `.autogit.json` was contagious — `git add -A` committed it, so one user running `autogit on` silently enabled auto-push for every collaborator who'd run `setup`. The git dir can't be committed. Common dir = one config per clone, shared by all worktrees. Legacy root files are still read (with a stderr nudge on ship); `autogit on` deletes and migrates them — and warns if the legacy file was tracked, since its deletion ships with the next turn. `autogit off` deletes both locations.
 - Exit-code contract (DECIDED 2026-06-11, now explicit): 0 = shipped or clean no-op; 1 = real failure (bad config JSON, secrets block, commit/push failure, detached HEAD, undo failures); NEVER 2. All human output on stderr, except `status`/`setup`/`teardown`/help/version reports on stdout.

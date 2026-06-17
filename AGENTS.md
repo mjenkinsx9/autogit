@@ -11,7 +11,7 @@ Everything about the project — what it is, architecture, internals, roadmap �
 
 ## Working rules
 
-- **NEVER publish to npm yourself** — no `npm publish`, ever. When a release is ready, ask Mike (the human owner) to publish: give clear & concise instructions plus the exact terminal command in a code block. (The package also needs a rename first — `@davidondrej/autogit` is the upstream author's scope.)
+- **Not an npm package.** `package.json` is `private: true` — autogit is distributed via the mjenkins-toolbox marketplace (`/plugin install autogit@mjenkins-toolbox`) and install-from-source (`npm link`, which uses the `bin` field; no registry needed). Never run `npm publish` or remove `private: true`. (The upstream `@davidondrej/autogit` is David Ondrej's separate package; this fork uses its own name `@mjenkinsx9/autogit`.)
 - Keep it minimal: small files, zero dependencies, simplest thing that works.
 - Treat the implementation as a reference of product intent, not fixed architecture.
 - Confirm any major structural change with the owner before implementing.
