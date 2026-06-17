@@ -17,3 +17,15 @@ Everything about the project — what it is, architecture, internals, roadmap �
 - Confirm any major structural change with the owner before implementing.
 - Roadmap items are owner-gated: don't build them without a go-ahead.
 - When behavior or architecture changes, update README.md.
+
+## Releasing — bump the version or the cache stays stale
+
+The `mjenkins-toolbox` marketplace caches this plugin **keyed by its manifest version**. Landing changes on `main` without bumping the version leaves installs on the stale cached copy — refreshes only pick up new code when the version string changes.
+
+When a change should reach users:
+
+1. Bump the version in all five manifests in lockstep — `.claude-plugin/plugin.json` (source of truth), `package.json`, `.codex-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `gemini-extension.json`. `test/plugin.test.js` fails if they diverge.
+2. `npm test`, commit via PR, merge.
+3. `git tag vX.Y.Z` + `gh release create vX.Y.Z`. (npm publish stays owner-gated — see Working rules.)
+
+Semver (pre-1.0): features → minor (`0.x.0`), fixes → patch (`0.x.y`).
